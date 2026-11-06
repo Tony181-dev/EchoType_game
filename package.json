@@ -1,0 +1,18 @@
+{
+  "name": "echo-flight",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A spaceship listening arcade for English micro-skills.",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "test": "node tests/game.test.cjs && node tests/audio.test.cjs && node tests/renderer.test.cjs",
+    "format": "prettier --write index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js tests scripts README.md package.json",
+    "format:check": "prettier --check index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js tests scripts README.md package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}
