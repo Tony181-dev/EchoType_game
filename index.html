@@ -81,13 +81,27 @@
                 </div>
                 <div class="center-notice" id="introNotice">
                   <div class="notice-line">ECHO FLIGHT</div>
-                  <strong>Đôi tai là radar.<br />Bàn phím là vũ khí.</strong>
-                  <p>Chọn chủ đề, nghe tín hiệu và bắn bằng bàn phím.</p>
+                  <strong id="noticeTitle"
+                    >Đôi tai là radar.<br />Bàn phím là vũ khí.</strong
+                  >
+                  <p id="noticeDetail">
+                    Chọn chủ đề, nghe tín hiệu và bắn bằng bàn phím.
+                  </p>
                   <button id="introStart" class="launch" type="button">
                     Bắt đầu bài học →
                   </button>
                 </div>
-                <div class="signal" id="signal">Sẵn sàng bắt tín hiệu</div>
+                <button
+                  id="sceneRestart"
+                  class="scene-restart"
+                  type="button"
+                  hidden
+                >
+                  ↻ Chơi lại
+                </button>
+                <div class="signal" id="signal" hidden>
+                  Sẵn sàng bắt tín hiệu
+                </div>
                 <div class="space-bottom">
                   <span id="spaceState">AUTO TARGETING / STANDBY</span
                   ><span>GÕ ĐÚNG → KHAI HỎA</span>
@@ -106,10 +120,19 @@
                 <div id="slots" class="slots" aria-label="Tiến độ ký tự"></div>
                 <span id="slotCount">0 / 0</span>
               </div>
+              <div id="moneyQuestion" class="money-question" hidden>
+                <span id="moneyInstruction">Write A NUMBER.</span
+                ><strong id="moneyPrompt">Price: £ ______</strong
+                ><small id="moneyHint"
+                  >Ký hiệu £ đã có sẵn. Chỉ nhập số tiền.</small
+                >
+              </div>
               <label class="input-label" for="answer">BỘ NHẬN TÍN HIỆU</label>
               <div class="input-row">
                 <div class="input-shell">
-                  <span>⌁</span
+                  <span aria-hidden="true">⌁</span
+                  ><span id="answerCurrency" class="answer-currency" hidden
+                    >£</span
                   ><input
                     id="answer"
                     autocomplete="off"
@@ -119,6 +142,15 @@
                     disabled
                   /><span class="input-hint">AUTO FIRE</span>
                 </div>
+                <button
+                  id="currencyKey"
+                  class="currency-key"
+                  type="button"
+                  hidden
+                  aria-label="Chèn ký hiệu bảng Anh"
+                >
+                  £
+                </button>
                 <button class="fire" id="fire" disabled>GỬI ↗</button>
               </div>
               <div class="utility">
@@ -164,114 +196,146 @@
               <div class="card-head">
                 <div>
                   <div class="label">MISSION CONTROL</div>
-                  <h2>Chuyến bay của bạn</h2>
+                  <h2>Thiết lập chuyến bay</h2>
                 </div>
-                <span class="radar-icon">◉</span>
+                <span class="radar-icon" aria-hidden="true">◉</span>
               </div>
-              <div id="studyPlanWrap">
-                <label for="studyPlan">BÀI LUYỆN</label
-                ><select id="studyPlan">
-                  <option value="series" selected>Theo series · 10 câu</option>
-                  <option value="random">Ngẫu nhiên · 5 câu</option>
-                </select>
+              <div class="topic-card" id="topicInfo">
+                <span>ĐANG HỌC</span><strong>Tên đường</strong
+                ><small>Nghe cả tên rồi đánh vần.</small>
               </div>
-              <div id="lessonPageWrap">
-                <label for="lessonPage">CHỌN BÀI TRONG CHỦ ĐỀ</label>
-                <select id="lessonPage"></select>
+              <div class="settings-group">
+                <div class="settings-row">
+                  <div id="studyPlanWrap" class="field">
+                    <label for="studyPlan">BÀI LUYỆN</label
+                    ><select id="studyPlan">
+                      <option value="series" selected>Series · 10 câu</option>
+                      <option value="random">Ngẫu nhiên</option>
+                    </select>
+                  </div>
+                  <div id="lessonPageWrap" class="field">
+                    <label for="lessonPage">CHỌN BÀI</label
+                    ><select id="lessonPage"></select>
+                  </div>
+                  <div id="drillLengthWrap" class="field field-wide" hidden>
+                    <label for="drillLength">ĐỘ DÀI CHUỖI</label
+                    ><select id="drillLength">
+                      <option value="60">60 ký tự · khởi động</option>
+                      <option value="120" selected>
+                        120 ký tự · tập trung
+                      </option>
+                      <option value="240">240 ký tự · bền bỉ</option>
+                      <option value="endless">Vô tận · luyện liên tục</option>
+                    </select>
+                  </div>
+                  <div id="learningWrap" class="field field-wide">
+                    <label for="learning">CÁCH LUYỆN</label
+                    ><select id="learning">
+                      <option value="reflex">Phản xạ từng ký tự</option>
+                      <option value="phrase">Nghe và nhập cả cụm</option>
+                      <option value="memory">Nghe xong, ghi nhớ chuỗi</option>
+                    </select>
+                  </div>
+                  <div id="moneyFormatWrap" class="field field-wide" hidden>
+                    <label for="moneyFormat">DẠNG ĐIỀN GIÁ TIỀN</label
+                    ><select id="moneyFormat">
+                      <option value="provided" selected>
+                        Đơn vị có sẵn · £ ___
+                      </option>
+                      <option value="required">Tự điền đơn vị · ___</option>
+                    </select>
+                  </div>
+                </div>
+                <p class="sub" id="lessonNote"></p>
+                <p class="sub" id="studyDescription"></p>
               </div>
-              <div id="drillLengthWrap" hidden>
-                <label for="drillLength">ĐỘ DÀI CHUỖI</label>
-                <select id="drillLength">
-                  <option value="60">60 ký tự · khởi động</option>
-                  <option value="120" selected>120 ký tự · tập trung</option>
-                  <option value="240">240 ký tự · bền bỉ</option>
-                  <option value="endless">Vô tận · luyện liên tục</option>
-                </select>
+              <div class="settings-group pace-group">
+                <label for="pace">TỐC ĐỘ ĐỌC</label>
+                <div class="pace-controls">
+                  <select id="pace">
+                    <option value="60">Rất chậm</option>
+                    <option value="80">Chậm</option>
+                    <option value="100" selected>Bình thường</option>
+                    <option value="130">Nhanh</option>
+                    <option value="160">Rất nhanh</option>
+                    <option value="200">Siêu tốc</option></select
+                  ><button
+                    id="previewPace"
+                    type="button"
+                    class="outline"
+                    hidden
+                  >
+                    ▷ Nghe thử nhịp
+                  </button>
+                </div>
+                <p id="paceDescription" class="pace-description"></p>
               </div>
-              <p class="sub" id="lessonNote">
-                Bài 02 · Tên đường · 10 câu theo thứ tự.
-              </p>
-              <label for="mode">CHẾ ĐỘ CHƠI</label
-              ><select id="mode">
-                <option value="practice">Luyện tập · không mất máu</option>
-                <option value="mission" selected>
-                  Nhiệm vụ · có giới hạn máu
-                </option>
-                <option value="survival">Sinh tồn · vô tận</option>
-              </select>
-              <p class="sub" id="modeDescription">
-                Vượt qua 5 chuỗi với 6 lớp khiên.
-              </p>
-              <label for="difficulty">ĐỘ KHÓ · SỐ MÁU</label
-              ><select id="difficulty">
-                <option value="easy">Dễ · 10 máu</option>
-                <option value="medium" selected>Trung bình · 6 máu</option>
-                <option value="hard">Khó · 3 máu</option>
-              </select>
-              <p class="sub" id="difficultyDescription">
-                Mỗi va chạm mất 1 máu. Độ khó không đổi tốc độ đọc.
-              </p>
-              <label for="category">PHẦN ĐANG HỌC</label
-              ><select id="category"></select
-              ><label for="learning">CÁCH LUYỆN</label
-              ><select id="learning">
-                <option value="reflex">Phản xạ từng ký tự</option>
-                <option value="phrase">Nghe và nhập cả cụm</option>
-                <option value="memory">Nghe xong, ghi nhớ chuỗi</option>
-              </select>
-              <p class="sub" id="studyDescription">
-                Gõ theo từng ký tự vừa nghe.
-              </p>
-              <label for="pace">TỐC ĐỘ ĐỌC</label
-              ><select id="pace">
-                <option value="60">Rất chậm</option>
-                <option value="80">Chậm</option>
-                <option value="100" selected>Bình thường</option>
-                <option value="130">Nhanh</option>
-                <option value="160">Rất nhanh</option>
-                <option value="200">Siêu tốc</option>
-              </select>
-              <p id="paceDescription" class="pace-description">
-                Nhịp mẫu · khoảng 0,36 giây giữa các chữ.
-              </p>
-              <label for="voice">GIỌNG ĐỌC</label
-              ><select id="voice">
-                <option value="sonia">Sonia · nữ · Anh</option>
-                <option value="ryan">Ryan · nam · Anh</option></select
-              ><button type="button" id="previewVoice" class="voice-preview">
-                ▷ Nghe thử giọng
-              </button>
-              <p class="sub voice-note">
-                Cả từ và phần đánh vần dùng cùng giọng đã chọn.
-              </p>
+              <div class="settings-group">
+                <div class="settings-row">
+                  <div class="field">
+                    <label for="mode">CHẾ ĐỘ CHƠI</label
+                    ><select id="mode">
+                      <option value="practice">Luyện tập</option>
+                      <option value="mission" selected>Nhiệm vụ</option>
+                      <option value="survival">Sinh tồn · vô tận</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="difficulty">ĐỘ KHÓ · SỐ MÁU</label
+                    ><select id="difficulty">
+                      <option value="easy">Dễ · 10 máu</option>
+                      <option value="medium" selected>
+                        Trung bình · 6 máu
+                      </option>
+                      <option value="hard">Khó · 3 máu</option>
+                    </select>
+                  </div>
+                </div>
+                <p class="sub" id="modeDescription"></p>
+                <p class="sub" id="difficultyDescription"></p>
+              </div>
+              <div class="settings-group voice-group">
+                <label for="voice">GIỌNG ĐỌC</label>
+                <div class="voice-controls">
+                  <select id="voice">
+                    <option value="sonia">Sonia · nữ · Anh</option>
+                    <option value="ryan">Ryan · nam · Anh</option></select
+                  ><button
+                    type="button"
+                    id="previewVoice"
+                    class="voice-preview"
+                  >
+                    ▷ Nghe giọng
+                  </button>
+                </div>
+                <p class="sub voice-note">
+                  Cả từ và phần đánh vần dùng cùng giọng.
+                </p>
+              </div>
               <button id="start" class="launch">
                 XUẤT PHÁT <span>→</span>
               </button>
-              <p class="setting-note">
-                Đổi tốc độ từ câu tiếp theo; chuỗi chữ/số áp dụng ngay.
-              </p>
-            </section>
-            <section class="brief card">
-              <span class="label">PILOT BRIEFING</span>
-              <h3>Nghe liền. Gõ theo.</h3>
-              <p>
-                Mỗi âm tạo một mục tiêu. Gõ đúng để bắn; bỏ lỡ thì mục tiêu chạm
-                tàu và mất khiên.
-              </p>
-              <div class="brief-row">
-                <span>NHỊP BÌNH THƯỜNG</span><strong>~0,36s / chữ</strong>
-              </div>
-              <div class="brief-row">
-                <span>NHỊP NHANH NHẤT</span><strong>Siêu tốc</strong>
-              </div>
+              <details class="extra-settings">
+                <summary>Chủ đề & mẹo làm bài</summary>
+                <label for="category">PHẦN ĐANG HỌC</label
+                ><select id="category"></select>
+                <p>
+                  Gõ đúng để bắn. <kbd>Esc</kbd> để tạm dừng. Chơi lại ngay trên
+                  màn bay khi muốn bắt đầu lại.
+                </p>
+                <p>
+                  Giá tiền: nếu đề đã có £, chỉ nhập số. Nếu chưa có đơn vị,
+                  nhập £15.50 hoặc 15.50 pounds, theo giới hạn từ của câu hỏi.
+                </p>
+                <p>
+                  Đổi tốc độ: bài theo chủ đề áp dụng từ câu tiếp theo; chuỗi
+                  chữ/số áp dụng ngay.
+                </p>
+              </details>
               <div class="best-line">
                 <span>KỶ LỤC</span><strong id="best">0000</strong>
               </div>
             </section>
-            <div class="topic-card" id="topicInfo">
-              <span>ĐANG HỌC</span><strong>Tên đường</strong
-              ><small>Nghe tên đường và phần đánh vần.</small>
-            </div>
           </aside>
         </div>
       </main>
@@ -304,8 +368,8 @@
         </p>
         <p>
           <strong>Chỉ chữ cái / Chỉ chữ số:</strong> nghe chuỗi ngẫu nhiên 60,
-          120, 240 ký tự hoặc vô tận và gõ ngay. Hai loại luôn tách riêng, không
-          nghỉ giữa các nhóm. Tạm dừng để lấy lại nhịp khi cần.
+          120, 240 ký tự hoặc vô tận và gõ ngay. Hai loại luôn tách riêng, có
+          khoảng nghỉ sau từng âm để gõ. Tạm dừng để lấy lại nhịp khi cần.
         </p>
         <p>
           Mới bắt đầu? Chọn <strong>Luyện tập</strong> và nhịp

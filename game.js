@@ -59,6 +59,19 @@ const $ = (id) => document.getElementById(id),
   "drillLength",
   "drillLengthWrap",
   "nextLesson",
+  "sceneRestart",
+  "noticeTitle",
+  "noticeDetail",
+  "previewPace",
+  "learningWrap",
+  "moneyFormat",
+  "moneyFormatWrap",
+  "moneyQuestion",
+  "moneyInstruction",
+  "moneyPrompt",
+  "moneyHint",
+  "answerCurrency",
+  "currencyKey",
 ].forEach((id) => (ui[id] = $(id)));
 const subjects = [
   {
@@ -189,7 +202,7 @@ function updateLessonNote() {
         : "Chuỗi " + ui.drillLength.value + " ký tự") +
       " · " +
       (lesson.stream === "letters" ? "chỉ A–Z" : "chỉ 0–9") +
-      " · không ngắt giữa các nhóm."
+      " · có khoảng nghỉ để nghe và gõ."
     : ui.mode.value === "survival"
       ? "Sinh tồn: rút lần lượt từ " +
         lesson.bank.length +
@@ -253,6 +266,7 @@ function describeMode() {
     ui.mode.value === "practice"
       ? "Chế độ luyện tập không mất máu."
       : "Mỗi va chạm mất 1 máu. Độ khó không đổi tốc độ đọc.";
+  ui.difficultyDescription.hidden = ui.mode.value === "practice";
   if (!game.running)
     ui.health.textContent =
       ui.mode.value === "practice" ? "∞" : health + " / " + health;
@@ -264,7 +278,9 @@ function configureVoice() {
   audio.cancel();
   audio.setVoice(ui.voice.value);
   ui.previewVoice.disabled = game.running;
-  ui.previewVoice.textContent = "▷ Nghe thử giọng";
+  ui.previewVoice.textContent = "▷ Nghe giọng";
+  ui.previewPace.disabled = game.running;
+  ui.previewPace.textContent = "▷ Nghe thử nhịp";
 }
 async function previewVoice() {
   if (game.running) return;
@@ -286,7 +302,33 @@ async function previewVoice() {
   } finally {
     if (generation === voicePreviewGeneration) {
       ui.previewVoice.disabled = false;
-      ui.previewVoice.textContent = "▷ Nghe thử giọng";
+      ui.previewVoice.textContent = "▷ Nghe giọng";
+    }
+  }
+}
+async function previewPace() {
+  if (game.running || !currentSubject().stream) return;
+  configureVoice();
+  const generation = voicePreviewGeneration;
+  ui.previewPace.disabled = true;
+  ui.previewPace.textContent = "Đang đọc thử…";
+  const text = currentSubject().stream === "letters" ? "NMNL" : "1591";
+  status(
+    "Nghe thử: " + text.split("").join(" · ") + ". Giữ nhịp, không cần gõ.",
+  );
+  try {
+    const plan = await audio.play(text, Number(ui.pace.value), 0.4, {
+      cadence: "drill",
+    });
+    if (plan)
+      await new Promise((resolve) => setTimeout(resolve, plan.duration + 400));
+  } catch (_) {
+    if (generation === voicePreviewGeneration)
+      status("Không phát được nhịp thử. Hãy thử lại.", "bad");
+  } finally {
+    if (generation === voicePreviewGeneration) {
+      ui.previewPace.disabled = false;
+      ui.previewPace.textContent = "▷ Nghe thử nhịp";
     }
   }
 }
@@ -305,6 +347,7 @@ function savePreferences() {
     "pace",
     "voice",
     "drillLength",
+    "moneyFormat",
   ])
     settings[id] = ui[id].value;
   try {
@@ -325,6 +368,7 @@ function restorePreferences() {
     pace: Object.keys(speedLevels),
     voice: ["sonia", "ryan"],
     drillLength: ["60", "120", "240", "endless"],
+    moneyFormat: ["provided", "required"],
   };
   for (const [id, options] of Object.entries(allowed))
     if (options.includes(String(saved[id]))) ui[id].value = String(saved[id]);
@@ -346,7 +390,7 @@ function populatePages() {
   for (const [index, page] of course.pages.entries()) {
     const option = document.createElement("option");
     option.value = String(index);
-    option.textContent = `Bài ${index + 1}/${course.pages.length} · câu ${index * 10 + 1}–${index * 10 + page.items.length}`;
+    option.textContent = `Bài ${index + 1}/${course.pages.length}`;
     ui.lessonPage.append(option);
   }
   ui.lessonPage.value = String(
@@ -409,25 +453,33 @@ function normal(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-function answersMatch(value, expected, category = game.category) {
+function answersMatch(
+  value,
+  expected,
+  category = game.category,
+  moneyFormat = game.moneyFormat || "provided",
+) {
   if (category === "phone")
     return (
       /^[+\d\s().-]+$/.test(value.trim()) &&
       value.replace(/\D/g, "") === expected.replace(/\D/g, "")
     );
   if (category === "money") {
+    const input = value.trim();
+    const withUnit =
+      /^(?:£\s*\d+(?:\.\d{2})?|\d+(?:\.\d{2})?\s+pounds?)$/i.test(input);
+    const numberOnly = /^\d+(?:\.\d{2})?$/.test(input);
+    if (moneyFormat === "required" ? !withUnit : !numberOnly) return false;
     const amount = (s) =>
       s
         .toLowerCase()
-        .replace(/£|\bgbp\b|\bpounds?\b/g, "")
+        .replace(/£|\bpounds?\b/g, "")
         .trim();
     const a = amount(value),
       b = amount(expected);
-    if (/^\d+(?:[.,]\d{1,2})?$/.test(a) && /^\d+(?:[.,]\d{1,2})?$/.test(b))
-      return (
-        Math.round(Number(a.replace(",", ".")) * 100) ===
-        Math.round(Number(b.replace(",", ".")) * 100)
-      );
+    if (/^\d+(?:\.\d{2})?$/.test(a) && /^\d+(?:\.\d{2})?$/.test(b))
+      return Math.round(Number(a) * 100) === Math.round(Number(b) * 100);
+    return false;
   }
   if (category === "codes" || category === "work") {
     const code = (s) =>
@@ -447,10 +499,19 @@ function currentSubject() {
   return subjects.find((s) => s.key === ui.category.value);
 }
 function setSubject(key) {
-  if (game.running) finish("ĐÃ ĐỔI PHẦN HỌC", "Chọn cách luyện và xuất phát.");
+  if (game.running)
+    finish("ĐÃ ĐỔI PHẦN HỌC", "Chọn cách luyện và xuất phát.", false);
   ui.lessonResults.hidden = true;
   ui.category.value = key;
   const meta = currentSubject();
+  if (game.round || game.drill) {
+    ui.noticeTitle.textContent = "Sẵn sàng bắt tín hiệu?";
+    ui.noticeDetail.textContent = meta.hint;
+    ui.introStart.textContent = "Bắt đầu bài học →";
+    ui.introNotice.classList.remove("hidden");
+    ui.sceneRestart.hidden = true;
+    ui.signal.hidden = true;
+  }
   for (const b of ui.subjectNav.children)
     b.classList.toggle("active", b.dataset.key === key);
   const [reflex, , memory] = ui.learning.options;
@@ -459,11 +520,15 @@ function setSubject(key) {
   if (!meta.spell) ui.learning.value = "phrase";
   if (meta.stream) ui.learning.value = "reflex";
   ui.learning.disabled = !!meta.stream;
+  ui.learningWrap.hidden = !!meta.stream;
+  ui.studyDescription.hidden = !!meta.stream;
   populatePages();
   ui.topicInfo.querySelector("strong").textContent = meta.name;
   ui.topicInfo.querySelector("small").textContent = meta.hint;
   studyChanged();
   describeMode();
+  speed(ui.pace.value);
+  updateMoneyQuestion();
   savePreferences();
 }
 function studyChanged() {
@@ -483,17 +548,44 @@ function studyChanged() {
   ui.fire.textContent = ui.learning.value === "reflex" ? "GỬI ↗" : "BẮN ↗";
   updateLessonNote();
 }
+function updateMoneyQuestion() {
+  const money = ui.category.value === "money",
+    provided = ui.moneyFormat.value !== "required";
+  ui.moneyFormatWrap.hidden = !money;
+  ui.moneyQuestion.hidden = !money;
+  ui.answerCurrency.hidden = !money || !provided;
+  ui.currencyKey.hidden = !money || provided;
+  ui.currencyKey.disabled = !game.running || game.paused;
+  ui.moneyInstruction.textContent = provided
+    ? "Write A NUMBER."
+    : "Write NO MORE THAN ONE WORD AND/OR A NUMBER.";
+  ui.moneyPrompt.textContent = provided ? "Price: £ ______" : "Price: ______";
+  ui.moneyHint.textContent = provided
+    ? "£ đã có sẵn trong đề. Chỉ nhập số, ví dụ 15.50."
+    : "Điền cả đơn vị, ví dụ £15.50 hoặc 15.50 pounds. Game có nút £ để chèn.";
+  if (money)
+    ui.prompt.textContent = provided
+      ? "Nghe giá tiền · chỉ điền phần số"
+      : "Nghe giá tiền · điền số và đơn vị";
+  if (money)
+    ui.answer.placeholder = provided
+      ? "Chỉ nhập số tiền, ví dụ 15.50"
+      : "Ví dụ 15.50 pounds hoặc £15.50";
+}
 function lock(playing) {
   ui.mode.disabled = playing;
   ui.studyPlan.disabled =
     playing || !!currentSubject().stream || ui.mode.value === "survival";
   ui.lessonPage.disabled = playing;
+  ui.moneyFormat.disabled = playing;
   ui.drillLength.disabled = playing || ui.mode.value === "survival";
   ui.category.disabled = playing;
   ui.learning.disabled = playing || !!currentSubject().stream;
   ui.difficulty.disabled = playing || ui.mode.value === "practice";
   ui.voice.disabled = playing;
   ui.previewVoice.disabled = playing;
+  ui.previewPace.disabled = playing;
+  ui.currencyKey.disabled = !playing;
   ui.answer.disabled = !playing;
   ui.fire.disabled = !playing;
   ui.pause.disabled = !playing;
@@ -616,6 +708,7 @@ async function start(reviewDeck = null) {
     course,
     page: pageIndex(),
     drillStats: {},
+    moneyFormat: ui.moneyFormat.value || "provided",
     deck,
     roundLimit: deck.length || 5,
     timer: null,
@@ -629,6 +722,9 @@ async function start(reviewDeck = null) {
   lock(true);
   ui.lessonResults.hidden = true;
   ui.introNotice.classList.add("hidden");
+  ui.signal.hidden = false;
+  ui.sceneRestart.hidden = false;
+  ui.introStart.textContent = "Bắt đầu bài học →";
   ui.start.textContent = "BẮT ĐẦU LẠI ↻";
   ui.pause.textContent = "Ⅱ Tạm dừng";
   renderer.reset();
@@ -738,10 +834,14 @@ function nextRound() {
   game.speed = Number(ui.pace.value);
   ui.answer.value = "";
   ui.answer.inputMode = game.category === "phone" ? "numeric" : "text";
+  if (game.category === "money")
+    ui.answer.inputMode = game.moneyFormat === "provided" ? "decimal" : "text";
+  updateMoneyQuestion();
   ui.targetKind.textContent = subjects
     .find((s) => s.key === game.category)
     .name.toUpperCase();
   ui.prompt.textContent = subjects.find((s) => s.key === game.category).hint;
+  if (game.category === "money") updateMoneyQuestion();
   hud();
   ui.answer.focus();
   playRound();
@@ -935,7 +1035,14 @@ function type(raw, commit = false) {
         answersMatch(value, a),
       );
   if (!correct) {
-    status("Chưa đúng — thử lại trước khi mục tiêu chạm tàu.", "bad");
+    status(
+      game.category === "money"
+        ? game.moneyFormat === "provided"
+          ? "Đề đã có £. Chỉ nhập số; giá lẻ dùng dấu chấm và hai số lẻ: 15.50."
+          : "Kiểm tra số tiền, đơn vị và dạng số: £15.50 hoặc 15.50 pounds."
+        : "Chưa đúng — thử lại trước khi mục tiêu chạm tàu.",
+      "bad",
+    );
     renderer.wrong();
     return;
   }
@@ -1080,7 +1187,7 @@ function showResults() {
   }
   updateLessonNote();
 }
-function finish(title, detail) {
+function finish(title, detail, focusReplay = true) {
   recordRound();
   cancel();
   game.running = false;
@@ -1099,6 +1206,12 @@ function finish(title, detail) {
   ui.prompt.textContent = detail;
   ui.spaceState.textContent = "AUTO TARGETING / STANDBY";
   ui.start.textContent = "CHƠI LẠI ↻";
+  ui.sceneRestart.hidden = true;
+  ui.noticeTitle.textContent = title;
+  ui.noticeDetail.textContent = `Trúng ${game.hits} · Bỏ lỡ ${game.misses} · ${game.score} điểm. Sẵn sàng thử lại?`;
+  ui.introStart.textContent = "↻ Chơi lại";
+  ui.introNotice.classList.remove("hidden");
+  ui.signal.hidden = true;
   status(
     "Trúng " +
       game.hits +
@@ -1110,6 +1223,7 @@ function finish(title, detail) {
   );
   slots();
   showResults();
+  if (focusReplay) ui.introStart.focus();
 }
 function pause() {
   if (!game.running) return;
@@ -1122,6 +1236,7 @@ function pause() {
     ui.pause.textContent = "▶ Tiếp tục";
     ui.answer.disabled = true;
     ui.fire.disabled = true;
+    ui.currencyKey.disabled = true;
     ui.signal.textContent = "FLIGHT PAUSED";
     status("Nhịp nghe sẽ tiếp tục từ âm chưa gõ.");
   } else {
@@ -1129,6 +1244,7 @@ function pause() {
     ui.pause.textContent = "Ⅱ Tạm dừng";
     ui.answer.disabled = false;
     ui.fire.disabled = false;
+    ui.currencyKey.disabled = false;
     ui.answer.focus();
     if (game.drill) resumeDrill();
     else if (game.resumePhase === "between") nextRound();
@@ -1164,6 +1280,24 @@ function speed(value) {
   const selected = Object.hasOwn(speedLevels, requested) ? requested : 100;
   ui.pace.value = String(selected);
   ui.paceDescription.textContent = speedLevels[selected].description;
+  const stream = !!currentSubject().stream;
+  ui.previewPace.hidden = !stream;
+  if (stream) {
+    const interval = EchoRhythm.DRILL_PACES[selected].interval;
+    ui.paceDescription.textContent =
+      String(interval).replace(".", ",") +
+      " giây / ký tự · khoảng " +
+      Math.round(60 / interval) +
+      " ký tự/phút. Âm đọc rõ, nghỉ để gõ.";
+  }
+  if (!game.running) {
+    voicePreviewGeneration++;
+    audio.cancel();
+    ui.previewPace.disabled = false;
+    ui.previewPace.textContent = "▷ Nghe thử nhịp";
+    ui.previewVoice.disabled = false;
+    ui.previewVoice.textContent = "▷ Nghe giọng";
+  }
   if (game.running && game.drill) {
     game.speed = selected;
     game.drill.speed = selected;
@@ -1195,8 +1329,12 @@ subjects.forEach((subject, i) => {
   button.addEventListener("click", () => setSubject(subject.key));
   ui.subjectNav.append(button);
 });
-ui.start.addEventListener("click", () => start());
-ui.introStart.addEventListener("click", () => start());
+function restart() {
+  start();
+}
+ui.start.addEventListener("click", restart);
+ui.introStart.addEventListener("click", restart);
+ui.sceneRestart.addEventListener("click", restart);
 ui.help.addEventListener("click", () => {
   if (game.running && !game.paused) pause();
   ui.helpDialog.showModal();
@@ -1248,6 +1386,13 @@ ui.mode.addEventListener("change", describeMode);
 ui.difficulty.addEventListener("change", describeMode);
 ui.voice.addEventListener("change", configureVoice);
 ui.previewVoice.addEventListener("click", previewVoice);
+ui.previewPace.addEventListener("click", previewPace);
+ui.moneyFormat.addEventListener("change", updateMoneyQuestion);
+ui.currencyKey.addEventListener("click", () => {
+  if (!game.running || game.paused) return;
+  ui.answer.value = "£" + ui.answer.value.replace(/^£/, "");
+  ui.answer.focus();
+});
 ui.category.addEventListener("change", () => setSubject(ui.category.value));
 ui.learning.addEventListener("change", studyChanged);
 ui.pace.addEventListener("change", () => speed(ui.pace.value));

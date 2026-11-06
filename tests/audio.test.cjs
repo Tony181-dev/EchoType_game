@@ -36,11 +36,26 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
     key === "sonia" ? "en-GB-SoniaNeural" : "en-GB-RyanNeural",
   );
   assert.equal(Object.keys(voice.characters).length, 36);
+  assert.equal(voice.corrections.N.source, "N.");
+  for (const pace of Object.values(c.window.EchoRhythm.DRILL_PACES))
+    for (const [char, variants] of Object.entries(voice.characters)) {
+      const bytes = Buffer.from(variants[pace.voiceSpeed], "base64"),
+        at = bytes.indexOf("data");
+      assert(
+        bytes.readUInt32LE(at + 4) / 44100 <= pace.interval,
+        key + " " + char + " must finish before the next drill sound",
+      );
+    }
   for (const [char, variants] of Object.entries(voice.characters)) {
-    assert.deepEqual(
-      Object.keys(variants).map(Number),
-      [60, 80, 100, 130, 160, 200],
-    );
+    assert.deepEqual(Object.keys(variants), [
+      "60",
+      "80",
+      "100",
+      "130",
+      "160",
+      "200",
+      "natural",
+    ]);
     for (const [speed, value] of Object.entries(variants)) {
       const data = Buffer.from(value, "base64");
       assert.equal(data.toString("ascii", 0, 4), "RIFF");
@@ -163,6 +178,16 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
   );
   audio.cancel();
   assert.equal(audio.sources.length, 0);
+  const slowDrill = await audio.play("NMNL", 60, 0.3, { cadence: "drill" });
+  assert(
+    Math.abs(slowDrill.events[1].born - slowDrill.events[0].born - 2400) < 1e-8,
+  );
+  assert(
+    audio.cache.has("ryan:N:natural"),
+    "Slow drills retain natural speech articulation",
+  );
+  assert.equal(audio.cache.has("ryan:N:60"), false);
+  audio.cancel();
   console.log(
     "Passed: " +
       clips +

@@ -43,7 +43,10 @@
     async start() {
       this.paused = false;
       const epoch = ++this.epoch;
-      await this.audio.prepare(alphabets[this.kind], this.speed);
+      await this.audio.prepare(
+        alphabets[this.kind],
+        window.EchoRhythm.DRILL_PACES[this.speed].voiceSpeed,
+      );
       if (this.paused || epoch !== this.epoch) return false;
       await this.append(1);
       await this.append();
@@ -68,6 +71,7 @@
         // introduces a synthetic pause between groups of random characters.
         const plan = await this.audio.play(text, this.speed, lead, {
           groupSize: 0,
+          cadence: "drill",
           startAt: this.clock,
         });
         if (!plan || this.paused || epoch !== this.epoch) return;
@@ -126,7 +130,7 @@
             pending.map((event) => event.char).join(""),
             this.speed,
             0.65,
-            { groupSize: 0 },
+            { groupSize: 0, cadence: "drill" },
           );
           if (!plan || this.paused || epoch !== this.epoch) return false;
           this.events.splice(
@@ -143,7 +147,12 @@
           this.clock = plan.nextStart;
         } else this.events.splice(0, this.events.length, ...past);
         this.onChange();
-        await this.append(pending.length ? 0 : 0.65);
+        // Replaying a long pending queue must not grow it with every restart.
+        if (
+          pending.length * window.EchoRhythm.DRILL_PACES[this.speed].interval <
+          4
+        )
+          await this.append(pending.length ? 0 : 0.65);
         return !this.paused && epoch === this.epoch;
       } catch (error) {
         if (epoch === this.epoch && !this.paused) this.onError(error);

@@ -42,6 +42,23 @@ function makeAudio() {
   };
 }
 (async () => {
+  const expectedIntervals = [2.4, 1.8, 1.2, 0.85, 0.6, 0.4];
+  for (const [index, speed] of [60, 80, 100, 130, 160, 200].entries()) {
+    const plan = context.window.EchoRhythm.pattern("NMNL159W", speed, {
+      cadence: "drill",
+    });
+    assert.equal(plan.window, expectedIntervals[index]);
+    for (let i = 1; i < plan.events.length; i++)
+      assert(
+        Math.abs(
+          plan.events[i].offset -
+            plan.events[i - 1].offset -
+            expectedIntervals[index],
+        ) < 1e-9,
+        "Each sound has the same intentional typing interval",
+      );
+    assert(Math.abs(plan.duration - expectedIntervals[index] * 8) < 1e-9);
+  }
   assert.match(randomSequence("letters", 10000), /^[A-Z]{10000}$/);
   assert.match(randomSequence("digits", 10000), /^\d{10000}$/);
   assert.throws(() => randomSequence("mixed", 10));
@@ -99,7 +116,14 @@ function makeAudio() {
     Array.from(indices),
   );
   assert.equal(endless.events.filter((event) => event.correct).length, 7);
-  assert.equal(audio.calls.at(-2).speed, 200);
+  assert.equal(audio.calls.at(-1).speed, 200);
+  const pendingCount = endless.events.filter((event) => !event.resolved).length;
+  for (let i = 0; i < 20; i++) await endless.resume();
+  assert.equal(
+    endless.events.filter((event) => !event.resolved).length,
+    pendingCount,
+    "Repeated replay does not grow the pending queue",
+  );
   for (let i = 0; i < 1000; i++) {
     const batch = endless.events.filter((event) => !event.resolved);
     batch.forEach((event) => (event.resolved = true));

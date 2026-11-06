@@ -106,6 +106,19 @@ const ids = [
   "drillLength",
   "drillLengthWrap",
   "nextLesson",
+  "sceneRestart",
+  "noticeTitle",
+  "noticeDetail",
+  "previewPace",
+  "learningWrap",
+  "moneyFormat",
+  "moneyFormatWrap",
+  "moneyQuestion",
+  "moneyInstruction",
+  "moneyPrompt",
+  "moneyHint",
+  "answerCurrency",
+  "currencyKey",
 ];
 const elements = Object.fromEntries(ids.map((id) => [id, new Element(id)]));
 elements.learning.options = [new Element(), new Element(), new Element()];
@@ -116,6 +129,7 @@ elements.difficulty.value = "medium";
 elements.voice.value = "sonia";
 elements.pace.value = "100";
 elements.drillLength.value = "120";
+elements.moneyFormat.value = "provided";
 let now = 0,
   jobs = [],
   jobId = 0,
@@ -284,7 +298,7 @@ const flush = () => new Promise((r) => setImmediate(r));
   lastSpeech.onend();
   await flush();
   assert.equal(e("game.events.length"), 1);
-  const answer = e("game.item.answer");
+  const answer = e("game.item.answer.replace('£','')");
   elements.answer.value = answer;
   e("type(" + JSON.stringify(answer) + ",false)");
   assert.equal(e("game.hits"), 0, "Whole answers need Enter or fire");
@@ -364,7 +378,9 @@ const flush = () => new Promise((r) => setImmediate(r));
     } else {
       e(
         "type(" +
-          JSON.stringify(c.EchoCourses.money.items[index].answer) +
+          JSON.stringify(
+            c.EchoCourses.money.items[index].answer.replace("£", ""),
+          ) +
           ",true)",
       );
       advance(701);
@@ -387,7 +403,11 @@ const flush = () => new Promise((r) => setImmediate(r));
   assert.equal(e("game.text"), c.EchoCourses.money.items[2].answer);
   lastSpeech.onend();
   await flush();
-  e("type(" + JSON.stringify(c.EchoCourses.money.items[2].answer) + ",true)");
+  e(
+    "type(" +
+      JSON.stringify(c.EchoCourses.money.items[2].answer.replace("£", "")) +
+      ",true)",
+  );
   advance(701);
   advance(1801);
   await flush();
@@ -402,7 +422,23 @@ const flush = () => new Promise((r) => setImmediate(r));
 
   assert.equal(e("answersMatch('0793 3555','07933555','phone')"), true);
   assert.equal(e("answersMatch('07935555','07933555','phone')"), false);
-  assert.equal(e("answersMatch('£15.5','£15.50','money')"), true);
+  assert.equal(e("answersMatch('15.50','£15.50','money')"), true);
+  assert.equal(e("answersMatch('15.5','£15.50','money')"), false);
+  assert.equal(e("answersMatch('15,50','£15.50','money')"), false);
+  assert.equal(
+    e("answersMatch('£15.5','£15.50','money')"),
+    false,
+    "Only the missing number is entered when £ is prefilled",
+  );
+  assert.equal(e("answersMatch('£15.50','£15.50','money','required')"), true);
+  assert.equal(e("answersMatch('£15.5','£15.50','money','required')"), false);
+  assert.equal(
+    e("answersMatch('15.50 pounds','£15.50','money','required')"),
+    true,
+  );
+  assert.equal(e("answersMatch('15.50','£15.50','money','required')"), false);
+  assert.equal(e("answersMatch('$15.50','£15.50','money','required')"), false);
+  assert.equal(e("answersMatch('££15.50','£15.50','money','required')"), false);
   assert.equal(e("answersMatch('£50','£15.50','money')"), false);
   assert.equal(e("answersMatch('BA-256','Flight BA256','codes')"), true);
   assert.equal(e("answersMatch('BA265','Flight BA256','codes')"), false);
@@ -504,6 +540,42 @@ const flush = () => new Promise((r) => setImmediate(r));
   assert.equal(e("game.running"), true);
   assert.equal(e("game.phase"), "playing");
   e("finish('Done','')");
+  assert.equal(elements.introNotice.states.has("hidden"), false);
+  assert.equal(elements.introStart.textContent, "↻ Chơi lại");
+  assert.equal(elements.sceneRestart.hidden, true);
+  e("setSubject('money')");
+  elements.mode.value = "practice";
+  elements.moneyFormat.value = "required";
+  elements.moneyFormat.handlers.change();
+  await e("start()");
+  assert.equal(elements.moneyQuestion.hidden, false);
+  assert.equal(elements.answerCurrency.hidden, true);
+  assert.equal(elements.currencyKey.hidden, false);
+  lastSpeech.onend();
+  await flush();
+  const amountRequired = e("game.item.answer.replace('£','')");
+  e("type(" + JSON.stringify(amountRequired) + ",true)");
+  assert.equal(
+    e("game.hits"),
+    0,
+    "Missing unit is rejected when it is not printed in the question",
+  );
+  elements.answer.value = amountRequired;
+  elements.currencyKey.handlers.click();
+  assert.equal(elements.answer.value, "£" + amountRequired);
+  e("type(" + JSON.stringify(amountRequired + " pounds") + ",true)");
+  assert.equal(
+    e("game.hits"),
+    1,
+    "Keyboard-friendly currency word is accepted",
+  );
+  elements.sceneRestart.handlers.click();
+  await flush();
+  assert.equal(e("game.score"), 0);
+  assert.equal(e("game.round"), 1);
+  assert.equal(elements.sceneRestart.hidden, false);
+  e("finish('Done','')");
+  elements.moneyFormat.value = "provided";
   storage.echoFlightPreferences = JSON.stringify({
     difficulty: "impossible",
     pace: 999,

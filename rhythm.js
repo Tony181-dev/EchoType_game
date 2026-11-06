@@ -7,8 +7,22 @@
     word: 1.1,
     flight: 0.95,
   };
+  // Character drills allow time to recognise a sound and press its key.
+  // Speech articulation stays natural; difficulty changes the silence after it.
+  const DRILL_PACES = {
+    60: { interval: 2.4, voiceSpeed: "natural" },
+    80: { interval: 1.8, voiceSpeed: "natural" },
+    100: { interval: 1.2, voiceSpeed: "natural" },
+    130: { interval: 0.85, voiceSpeed: "natural" },
+    160: { interval: 0.6, voiceSpeed: 100 },
+    200: { interval: 0.4, voiceSpeed: 130 },
+  };
   function pattern(text, speed = 100, options = {}) {
     const rate = speed / 100;
+    const drill =
+      options.cadence === "drill"
+        ? DRILL_PACES[speed] || DRILL_PACES[100]
+        : null;
     const events = [];
     let at = 0,
       count = 0;
@@ -24,10 +38,11 @@
       }
       events.push({ char: ch, offset: at, index: events.length });
       count++;
-      at +=
-        (ch === "W" ? 0.56 : /\d/.test(ch) ? BASE.digit : BASE.letter) / rate;
+      at += drill
+        ? drill.interval
+        : (ch === "W" ? 0.56 : /\d/.test(ch) ? BASE.digit : BASE.letter) / rate;
       const next = tokens[i + 1];
-      const groupSize = options.groupSize ?? 4;
+      const groupSize = drill ? 0 : (options.groupSize ?? 4);
       if (
         groupSize > 0 &&
         count === groupSize &&
@@ -38,7 +53,11 @@
         count = 0;
       }
     }
-    return { events, duration: at, window: BASE.flight / rate };
+    return {
+      events,
+      duration: at,
+      window: drill ? drill.interval : BASE.flight / rate,
+    };
   }
   class RhythmAudio {
     constructor() {
@@ -88,7 +107,11 @@
     async play(text, speed = 100, lead = 0.2, options = {}) {
       const generation = ++this.epoch;
       const voice = this.voice;
-      const bucket = await this.prepare(text, speed);
+      const voiceSpeed =
+        options.cadence === "drill"
+          ? (DRILL_PACES[speed] || DRILL_PACES[100]).voiceSpeed
+          : speed;
+      const bucket = await this.prepare(text, voiceSpeed);
       if (generation !== this.epoch) return null;
       const p = pattern(text, speed, options);
       const scheduled =
@@ -170,5 +193,5 @@
       this.sources = [];
     }
   }
-  window.EchoRhythm = { RhythmAudio, pattern, BASE };
+  window.EchoRhythm = { RhythmAudio, pattern, BASE, DRILL_PACES };
 })();
