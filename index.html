@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#080d19" />
     <meta
       name="description"
-      content="Luyện nghe tiếng Anh bằng game tàu bay: 10 bài về tên riêng, số điện thoại, giá tiền và các chi tiết thường gặp."
+      content="Luyện nghe tiếng Anh bằng game tàu bay: 420 câu, 42 bài và hai chế độ phản xạ chữ hoặc số liên tục."
     />
     <title>Echo Flight — Listening Arcade</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -148,6 +148,9 @@
               <p id="resultsSummary"></p>
               <ol id="resultsList"></ol>
               <div class="results-actions">
+                <button id="nextLesson" class="launch" hidden>
+                  Bài tiếp theo →
+                </button>
                 <button id="retryMistakes" class="outline">
                   Luyện lại câu sai · không mất máu</button
                 ><button id="replayLesson" class="outline">
@@ -165,11 +168,26 @@
                 </div>
                 <span class="radar-icon">◉</span>
               </div>
-              <label for="studyPlan">BÀI LUYỆN</label
-              ><select id="studyPlan">
-                <option value="series" selected>Theo series · 10 câu</option>
-                <option value="random">Ngẫu nhiên · 5 câu</option>
-              </select>
+              <div id="studyPlanWrap">
+                <label for="studyPlan">BÀI LUYỆN</label
+                ><select id="studyPlan">
+                  <option value="series" selected>Theo series · 10 câu</option>
+                  <option value="random">Ngẫu nhiên · 5 câu</option>
+                </select>
+              </div>
+              <div id="lessonPageWrap">
+                <label for="lessonPage">CHỌN BÀI TRONG CHỦ ĐỀ</label>
+                <select id="lessonPage"></select>
+              </div>
+              <div id="drillLengthWrap" hidden>
+                <label for="drillLength">ĐỘ DÀI CHUỖI</label>
+                <select id="drillLength">
+                  <option value="60">60 ký tự · khởi động</option>
+                  <option value="120" selected>120 ký tự · tập trung</option>
+                  <option value="240">240 ký tự · bền bỉ</option>
+                  <option value="endless">Vô tận · luyện liên tục</option>
+                </select>
+              </div>
               <p class="sub" id="lessonNote">
                 Bài 02 · Tên đường · 10 câu theo thứ tự.
               </p>
@@ -230,7 +248,7 @@
                 XUẤT PHÁT <span>→</span>
               </button>
               <p class="setting-note">
-                Đổi tốc độ để áp dụng từ câu tiếp theo.
+                Đổi tốc độ từ câu tiếp theo; chuỗi chữ/số áp dụng ngay.
               </p>
             </section>
             <section class="brief card">
@@ -285,6 +303,11 @@
           nhấn <kbd>Enter</kbd> hoặc <strong>Bắn</strong>.
         </p>
         <p>
+          <strong>Chỉ chữ cái / Chỉ chữ số:</strong> nghe chuỗi ngẫu nhiên 60,
+          120, 240 ký tự hoặc vô tận và gõ ngay. Hai loại luôn tách riêng, không
+          nghỉ giữa các nhóm. Tạm dừng để lấy lại nhịp khi cần.
+        </p>
+        <p>
           Mới bắt đầu? Chọn <strong>Luyện tập</strong> và nhịp
           <strong>Chậm</strong>. Nhấn <kbd>Esc</kbd> khi chơi để tạm dừng. Mở
           hướng dẫn cũng tự dừng chuyến bay.
@@ -293,10 +316,15 @@
       </form>
     </dialog>
     <script src="lessons.js"></script>
+    <script src="content.js"></script>
     <script src="courses.js"></script>
+    <script src="questions.js"></script>
     <script src="voice-sonia.js"></script>
     <script src="voice-ryan.js"></script>
+    <script src="voice-sonia-extra.js"></script>
+    <script src="voice-ryan-extra.js"></script>
     <script src="rhythm.js"></script>
+    <script src="drills.js"></script>
     <script src="space.js"></script>
     <script src="game.js"></script>
   </body>

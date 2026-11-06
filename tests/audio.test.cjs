@@ -18,7 +18,16 @@ const c = {
   },
 };
 vm.createContext(c);
-for (const f of ["voice-sonia.js", "voice-ryan.js", "lessons.js", "rhythm.js"])
+for (const f of [
+  "voice-sonia.js",
+  "voice-ryan.js",
+  "voice-sonia-extra.js",
+  "voice-ryan-extra.js",
+  "lessons.js",
+  "content.js",
+  "courses.js",
+  "rhythm.js",
+])
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), c);
 let clips = 0;
 for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
@@ -52,6 +61,14 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
         voice.narrations[row.spoken],
         key + " missing phrase " + row.spoken,
       );
+  for (const course of Object.values(c.window.EchoCourses))
+    for (const row of course.bank)
+      if (course !== c.window.EchoCourses.phone || row.recorded)
+        assert(
+          voice.narrations[row.spoken],
+          key + " missing course phrase " + row.spoken,
+        );
+  assert.equal(Object.keys(voice.narrations).length, 390);
 }
 (async () => {
   const audio = new c.window.EchoRhythm.RhythmAudio();
@@ -109,10 +126,47 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
   await newPrepare;
   assert.equal(audio.cache.get("ryan:A:100").voice, "ryan");
   assert.equal(audio.cache.has("sonia:A:100"), false);
+  const started = [];
+  audio.context = {
+    state: "running",
+    currentTime: 10,
+    destination: {},
+    decodeAudioData: async () => ({}),
+    createBufferSource: () => ({
+      playbackRate: {},
+      connect() {},
+      start(at) {
+        started.push(at);
+      },
+      stop() {},
+    }),
+  };
+  audio.cache.clear();
+  const batch1 = await audio.play("ABCD", 100, 1, { groupSize: 0 });
+  const batch2 = await audio.play("EFGH", 100, 0, {
+    groupSize: 0,
+    startAt: batch1.nextStart,
+  });
+  assert.equal(
+    started[4],
+    batch1.nextStart.audio,
+    "Chunks share the audio clock with no added lead",
+  );
+  assert.equal(batch2.events[0].born, batch1.nextStart.wall);
+  assert.equal(audio.sources.length, 8);
+  const source = audio.sources[0];
+  source.onended();
+  assert.equal(
+    audio.sources.length,
+    7,
+    "Finished audio nodes are released during endless play",
+  );
+  audio.cancel();
+  assert.equal(audio.sources.length, 0);
   console.log(
     "Passed: " +
       clips +
-      " non-silent neural spelling clips, 208 matching-voice phrases, complete subject coverage, voice-cache isolation and playback cancellation.",
+      " non-silent neural spelling clips, 780 matching-voice phrases, complete subject coverage, voice-cache isolation and playback cancellation.",
   );
 })().catch((e) => {
   console.error(e);

@@ -1122,6 +1122,23 @@ footer {
 .help-content strong {
   color: #e2f3e5;
 }
+.subject-button.stream-subject {
+  border-color: #42664f;
+  background: linear-gradient(120deg, #192c26, #101e2b);
+}
+.subject-button.stream-subject.active {
+  border-color: #bafc80;
+  background: #263a22;
+}
+#lessonPageWrap,
+#drillLengthWrap {
+  margin-top: 12px;
+}
+.results-actions .launch {
+  min-height: 40px;
+  font-size: 12px;
+  padding: 10px 16px;
+}
 .help-content kbd {
   display: inline-block;
   border: 1px solid #607c8d;

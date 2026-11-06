@@ -74,6 +74,7 @@ const ids = [
   "mode",
   "modeDescription",
   "studyPlan",
+  "studyPlanWrap",
   "lessonNote",
   "lessonResults",
   "resultsTitle",
@@ -100,6 +101,11 @@ const ids = [
   "helpDialog",
   "missionProgress",
   "progressFill",
+  "lessonPage",
+  "lessonPageWrap",
+  "drillLength",
+  "drillLengthWrap",
+  "nextLesson",
 ];
 const elements = Object.fromEntries(ids.map((id) => [id, new Element(id)]));
 elements.learning.options = [new Element(), new Element(), new Element()];
@@ -109,6 +115,7 @@ elements.studyPlan.value = "random";
 elements.difficulty.value = "medium";
 elements.voice.value = "sonia";
 elements.pace.value = "100";
+elements.drillLength.value = "120";
 let now = 0,
   jobs = [],
   jobId = 0,
@@ -188,29 +195,42 @@ const c = {
 };
 c.window = c;
 vm.createContext(c);
-for (const f of ["lessons.js", "courses.js", "rhythm.js"])
+for (const f of [
+  "lessons.js",
+  "content.js",
+  "courses.js",
+  "questions.js",
+  "rhythm.js",
+  "drills.js",
+])
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), c);
 c.EchoRhythm.RhythmAudio = class {
   setVoice(key) {
     this.voice = key;
   }
   async ready() {}
+  async prepare() {}
   cancel() {}
   narrate(text) {
     return new Promise((resolve) => {
       lastSpeech = { text, onend: resolve };
     });
   }
-  async play(text, speed, lead) {
-    const p = c.EchoRhythm.pattern(text, speed);
+  async play(text, speed, lead, options = {}) {
+    const p = c.EchoRhythm.pattern(text, speed, options);
+    const wall = options.startAt?.wall ?? now + lead * 1000;
     return {
       events: p.events.map((e) => ({
         ...e,
-        born: now + (lead + e.offset) * 1000,
-        deadline: now + (lead + e.offset + p.window) * 1000,
+        born: wall + e.offset * 1000,
+        deadline: wall + (e.offset + p.window) * 1000,
         resolved: false,
       })),
       duration: p.duration * 1000,
+      nextStart: {
+        wall: wall + p.duration * 1000,
+        audio: (wall + p.duration * 1000) / 1000,
+      },
     };
   }
 };
@@ -218,7 +238,7 @@ vm.runInContext(fs.readFileSync(path.join(root, "game.js"), "utf8"), c);
 const e = (source) => vm.runInContext(source, c);
 const flush = () => new Promise((r) => setImmediate(r));
 (async () => {
-  assert.equal(elements.subjectNav.children.length, 10);
+  assert.equal(elements.subjectNav.children.length, 12);
   const p100 = c.EchoRhythm.pattern("OXFORD AVENUE", 100),
     p300 = c.EchoRhythm.pattern("OXFORD AVENUE", 300);
   assert(Math.abs(p100.duration / 3 - p300.duration) < 0.001);
@@ -272,6 +292,9 @@ const flush = () => new Promise((r) => setImmediate(r));
   assert.equal(e("game.hits"), 1);
   assert.equal(e("game.score"), 50);
   e("setSubject('phone')");
+  // Use an 11-digit series item so every health level has enough targets.
+  elements.studyPlan.value = "series";
+  elements.lessonPage.value = "1";
   elements.learning.value = "reflex";
   elements.mode.value = "mission";
   await e("start()");
@@ -313,6 +336,7 @@ const flush = () => new Promise((r) => setImmediate(r));
   e("configureVoice()");
   assert.equal(e("audio.voice"), "sonia");
   for (const course of Object.values(c.EchoCourses)) {
+    if (course.stream) continue;
     assert.equal(course.items.length, 10);
     assert.equal(
       new Set(course.items.map((i) => i.answer)).size,
@@ -408,6 +432,78 @@ const flush = () => new Promise((r) => setImmediate(r));
   elements.voice.value = "sonia";
   e("restorePreferences()");
   assert.equal(elements.voice.value, "ryan");
+  e("setSubject('streets')");
+  elements.studyPlan.value = "series";
+  elements.mode.value = "practice";
+  elements.lessonPage.value = "3";
+  elements.lessonPage.handlers.change();
+  await e("start()");
+  assert.equal(e("game.text"), c.EchoCourses.streets.pages[3].items[0].answer);
+  assert.equal(e("game.page"), 3);
+  e("finish('Done','')");
+  elements.nextLesson.handlers.click();
+  await flush();
+  assert.equal(e("game.page"), 4);
+  assert.equal(e("game.text"), c.EchoCourses.streets.pages[4].items[0].answer);
+  e("setSubject('letters')");
+  assert.equal(elements.learning.value, "reflex");
+  assert(elements.learning.disabled);
+  assert.equal(elements.drillLengthWrap.hidden, false);
+  elements.drillLength.value = "60";
+  await e("start()");
+  assert.equal(e("game.phase"), "playing");
+  assert.equal(e("game.drill.total"), 60);
+  assert.match(e("game.events.map(e=>e.char).join('')"), /^[A-Z]+$/);
+  advance(e("game.events[0].born") - now + 1);
+  e("type(game.events[0].char)");
+  assert.equal(e("game.hits"), 1);
+  const pending = e("game.events.find(e=>!e.resolved).char");
+  e("pause()");
+  advance(30000);
+  e("tick(performance.now())");
+  assert.equal(e("game.misses"), 0);
+  e("pause()");
+  await flush();
+  assert.equal(e("game.events.find(e=>!e.resolved).char"), pending);
+  e("speed(160)");
+  await flush();
+  assert.equal(e("game.drill.speed"), 160);
+  assert.equal(e("game.hits"), 1);
+  for (let i = 0; i < 80 && e("game.running"); i++) {
+    const at = e("game.events.find(e=>!e.resolved)?.born");
+    if (at === undefined) {
+      e("tick(performance.now())");
+      await flush();
+      continue;
+    }
+    advance(Math.max(0, at - now + 1));
+    e("type(game.events.find(e=>!e.resolved).char)");
+    e("tick(performance.now())");
+    await flush();
+  }
+  assert.equal(e("game.running"), false);
+  assert.equal(e("game.hits"), 60);
+  assert.equal(e("game.misses"), 0);
+  assert.equal(elements.resultsScore.textContent, "100%");
+  assert.equal(elements.retryMistakes.hidden, true);
+  assert.equal(
+    e("Object.values(game.drillStats).reduce((n,s)=>n+s.hits,0)"),
+    60,
+  );
+  e("setSubject('digits')");
+  elements.drillLength.value = "endless";
+  await e("start()");
+  assert.equal(e("game.drill.total"), null);
+  assert.match(e("game.events.map(e=>e.char).join('')"), /^\d+$/);
+  assert.equal(elements.missionProgress.hidden, true);
+  for (let i = 0; i < 5; i++) {
+    advance(20000);
+    e("tick(performance.now())");
+    await flush();
+  }
+  assert.equal(e("game.running"), true);
+  assert.equal(e("game.phase"), "playing");
+  e("finish('Done','')");
   storage.echoFlightPreferences = JSON.stringify({
     difficulty: "impossible",
     pace: 999,
@@ -418,7 +514,7 @@ const flush = () => new Promise((r) => setImmediate(r));
   assert.equal(elements.difficulty.value, "medium");
   assert.equal(elements.voice.value, "ryan");
   console.log(
-    "Passed: audio rhythm scaling, grouped spelling, natural word before letters, all subjects, hits, pause/resume, phrase answers, six speed presets, three health difficulties voice selection, ten-question ordered lessons, saved progress and mistake review.",
+    "Passed: audio rhythm scaling, whole word before spelling, all subjects, scoring/health, pause/resume, phrase answers, speed presets, voices, multi-page lessons, saved progress, mistake review and isolated finite/endless character sessions.",
   );
 })().catch((err) => {
   console.error(err);

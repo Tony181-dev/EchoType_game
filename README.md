@@ -18,7 +18,7 @@ Open the printed address, normally `http://127.0.0.1:8765`. Set `PORT` to choose
 
 ## Learn in short, structured sessions
 
-The **10 topic lessons each contain 10 ordered questions**:
+The **420 questions are divided into 42 ordered lessons of 10**, across 10 topics. Street names and personal names each have five lessons; the other topics each have four. Choose a lesson within any topic, and use **Next lesson** after the report to continue.
 
 | Topic                  | What you practise                                    |
 | ---------------------- | ---------------------------------------------------- |
@@ -33,7 +33,13 @@ The **10 topic lessons each contain 10 ordered questions**:
 | Directions             | Position, distance and direction phrases             |
 | Companies and products | Unfamiliar technology names                          |
 
-Choose an ordered lesson, a random five-question session, or endless survival. Reports show each answer, whole-question accuracy and letter accuracy. **Review mistakes** replays attempted questions answered incorrectly, without health loss. Unattempted questions are not marked wrong. Lesson progress and settings are stored locally in your browser.
+Choose an ordered lesson, a random five-question session, or endless survival. Random questions are drawn without repetition until the topic's pool is exhausted, including across sessions; the cycle boundary avoids an immediate repeat. Reports show each answer, whole-question accuracy and letter accuracy. **Review mistakes** replays attempted questions answered incorrectly, without health loss. Unattempted questions are not marked wrong. Each lesson has its own progress record, saved locally with settings and selected pages.
+
+### Continuous character training
+
+Two additional sections are **Letters only (A–Z)** and **Digits only (0–9)**. They never mix the two character sets. Choose a fresh random sequence of **60, 120 or 240 characters**, or **Endless**. Characters are read continuously without group pauses or between-question screens, using the same spaceship and automatic shooting.
+
+Use Practice for unlimited health, Mission for the selected length with limited health, or Survival for an endless challenge. Pause, replay and speed changes preserve the unresolved sequence, score and health. Speed changes take effect immediately in these two sections. The report shows overall accuracy and hits/misses for each character. Endless training retains a small rolling event queue rather than accumulating the entire session in memory.
 
 ### Three ways to listen
 
@@ -53,7 +59,7 @@ Some subjects, including prices and directions, use complete answers.
 
 Difficulty changes health independently from reading speed. **Practice** never loses health. **Mission** ends when the lesson is complete or health runs out. **Survival** continues until health runs out.
 
-Reading speed has six named levels: Very slow, Slow, Normal, Fast, Very fast and Turbo. Changes apply from the next question. Normal uses roughly 0.36 seconds between ordinary letters, with pauses between groups and words; W has extra articulation time.
+Reading speed has six named levels: Very slow, Slow, Normal, Fast, Very fast and Turbo. Changes apply from the next question in topic lessons, and immediately in continuous character training. Normal uses roughly 0.36 seconds between ordinary letters, with pauses between groups and words in topic lessons; W has extra articulation time.
 
 ### Consistent speech
 
@@ -81,11 +87,12 @@ npm test
 npm run format:check
 ```
 
-| Tests                     | Coverage                                                                                                                |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `tests/game.test.cjs`     | Ordered lessons, scoring, health boundaries, answer formats, pause/help, preferences, progress and mistake review       |
-| `tests/audio.test.cjs`    | 432 non-silent letter/digit clips, 208 phrases, coverage, cancellation and voice isolation during asynchronous decoding |
-| `tests/renderer.test.cjs` | Delayed-frame explosions, single hit resolution, consistent steering, pause and reduced effects                         |
+| Tests                     | Coverage                                                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/game.test.cjs`     | Ordered lessons, scoring, health boundaries, answer formats, pause/help, preferences, progress and mistake review                                              |
+| `tests/drills.test.cjs`   | Strict character sets, finite goals, 24,000+ endless characters, bounded memory, pause/speed, no-repeat draws and all 42 lessons                               |
+| `tests/audio.test.cjs`    | 432 non-silent letter/digit clips, 780 phrases, coverage, continuous scheduling, source cleanup, cancellation and voice isolation during asynchronous decoding |
+| `tests/renderer.test.cjs` | Delayed-frame explosions, single hit resolution, consistent steering, pause and reduced effects                                                                |
 
 `npm run format` formats source files. GitHub Actions runs the same checks for pushes and pull requests. Browser checks cover real playback progress, both voice previews, lesson scoring and the result report; automated checks do not rate perceived voice naturalness.
 
@@ -93,9 +100,11 @@ npm run format:check
 
 - `game.js` — lesson/session state and input handling.
 - `rhythm.js` — grouped audio timing, playback and voice caches.
+- `drills.js` — continuous, strictly separated letter/digit streams.
+- `questions.js` — persistent random question bags without repeats.
 - `space.js` — canvas ships, targets, particles and camera feedback.
-- `courses.js`, `lessons.js` — ordered lessons and practice content.
-- `voice-sonia.js`, `voice-ryan.js` — bundled speech banks.
+- `courses.js`, `lessons.js`, `content.js` — 42 ordered lessons and expanded practice content.
+- `voice-sonia.js`, `voice-ryan.js`, `voice-*-extra.js` — bundled speech banks.
 - `scripts/serve.mjs` — local static preview.
 
 Progress and preferences are stored locally. Answers are processed in the browser. There is no account system, backend or analytics.

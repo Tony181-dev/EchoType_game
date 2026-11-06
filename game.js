@@ -27,6 +27,7 @@ const $ = (id) => document.getElementById(id),
   "mode",
   "modeDescription",
   "studyPlan",
+  "studyPlanWrap",
   "lessonNote",
   "lessonResults",
   "resultsTitle",
@@ -53,8 +54,27 @@ const $ = (id) => document.getElementById(id),
   "helpDialog",
   "missionProgress",
   "progressFill",
+  "lessonPage",
+  "lessonPageWrap",
+  "drillLength",
+  "drillLengthWrap",
+  "nextLesson",
 ].forEach((id) => (ui[id] = $(id)));
 const subjects = [
+  {
+    key: "letters",
+    name: "Chỉ chữ cái",
+    hint: "Chuỗi A–Z ngẫu nhiên · nghe đến đâu gõ đến đó.",
+    spell: true,
+    stream: "letters",
+  },
+  {
+    key: "digits",
+    name: "Chỉ chữ số",
+    hint: "Chuỗi 0–9 ngẫu nhiên · không có chữ cái.",
+    spell: true,
+    stream: "digits",
+  },
   {
     key: "phone",
     name: "Số điện thoại",
@@ -155,15 +175,30 @@ const speedLevels = {
 function updateLessonNote() {
   const lesson = EchoCourses[ui.category.value];
   if (!lesson) return;
-  const key = ui.category.value + ":" + ui.learning.value;
+  const stream = !!lesson.stream;
+  ui.studyPlanWrap.hidden = stream;
+  ui.drillLengthWrap.hidden = !stream;
+  ui.lessonPageWrap.hidden =
+    stream || ui.studyPlan.value !== "series" || ui.mode.value === "survival";
+  const key = progressKey(ui.category.value, ui.learning.value, pageIndex());
   const progress = courseProgress[key];
   const length = ui.studyPlan.value === "series" ? 10 : 5;
-  ui.lessonNote.textContent =
-    ui.mode.value === "survival"
-      ? "Sinh tồn: các câu được chọn ngẫu nhiên, không giới hạn."
+  ui.lessonNote.textContent = stream
+    ? (ui.mode.value === "survival" || ui.drillLength.value === "endless"
+        ? "Chuỗi vô tận"
+        : "Chuỗi " + ui.drillLength.value + " ký tự") +
+      " · " +
+      (lesson.stream === "letters" ? "chỉ A–Z" : "chỉ 0–9") +
+      " · không ngắt giữa các nhóm."
+    : ui.mode.value === "survival"
+      ? "Sinh tồn: rút lần lượt từ " +
+        lesson.bank.length +
+        " câu, không lặp trước khi hết lượt."
       : ui.studyPlan.value === "series"
         ? "Bài " +
-          String(lesson.id).padStart(2, "0") +
+          (pageIndex() + 1) +
+          "/" +
+          lesson.pages.length +
           " · " +
           lesson.title +
           " · " +
@@ -176,7 +211,11 @@ function updateLessonNote() {
               progress.total +
               "."
             : "")
-        : "Luyện ngẫu nhiên " + length + " câu từ chủ đề đã chọn.";
+        : "Rút " +
+          length +
+          " câu từ " +
+          lesson.bank.length +
+          " câu · tránh lặp qua các lần chơi.";
   for (const button of ui.subjectNav.children) {
     const completed = Object.keys(courseProgress).some((k) =>
       k.startsWith(button.dataset.key + ":"),
@@ -186,15 +225,29 @@ function updateLessonNote() {
   }
 }
 function describeMode() {
+  const stream = !!currentSubject().stream;
   const health = difficulties[ui.difficulty.value].health;
-  const count = ui.studyPlan.value === "series" ? 10 : 5;
+  const count = stream
+    ? ui.drillLength.value === "endless"
+      ? "∞"
+      : ui.drillLength.value
+    : ui.studyPlan.value === "series"
+      ? 10
+      : 5;
+  const unit = stream ? " ký tự" : " câu";
   ui.modeDescription.textContent =
     ui.mode.value === "practice"
-      ? count + " câu · không mất máu khi va chạm."
+      ? (count === "∞" ? "Luyện liên tục" : count + unit) +
+        " · không mất máu khi va chạm."
       : ui.mode.value === "mission"
-        ? "Vượt qua " + count + " câu với " + health + " máu."
+        ? (count === "∞" ? "Bay liên tục" : "Vượt qua " + count + unit) +
+          " với " +
+          health +
+          " máu."
         : "Bay liên tục đến khi hết " + health + " máu.";
-  ui.studyPlan.disabled = game.running || ui.mode.value === "survival";
+  ui.studyPlan.disabled =
+    game.running || stream || ui.mode.value === "survival";
+  ui.drillLength.disabled = game.running || ui.mode.value === "survival";
   ui.difficulty.disabled = game.running || ui.mode.value === "practice";
   ui.difficultyDescription.textContent =
     ui.mode.value === "practice"
@@ -238,6 +291,7 @@ async function previewVoice() {
   }
 }
 const audio = new EchoRhythm.RhythmAudio();
+const questionBag = new EchoQuestions.QuestionBag(localStorage);
 let preferencesReady = false;
 function savePreferences() {
   if (!preferencesReady) return;
@@ -250,6 +304,7 @@ function savePreferences() {
     "learning",
     "pace",
     "voice",
+    "drillLength",
   ])
     settings[id] = ui[id].value;
   try {
@@ -269,11 +324,38 @@ function restorePreferences() {
     learning: ["reflex", "phrase", "memory"],
     pace: Object.keys(speedLevels),
     voice: ["sonia", "ryan"],
+    drillLength: ["60", "120", "240", "endless"],
   };
   for (const [id, options] of Object.entries(allowed))
     if (options.includes(String(saved[id]))) ui[id].value = String(saved[id]);
 }
 let courseProgress = {};
+let pageChoices = {};
+try {
+  pageChoices = JSON.parse(localStorage.getItem("echoFlightPageChoices")) || {};
+} catch (_) {}
+function pageIndex() {
+  return Number(ui.lessonPage.value) || 0;
+}
+function progressKey(category, learning, page = 0) {
+  return category + ":" + learning + (page ? ":p" + page : "");
+}
+function populatePages() {
+  const course = EchoCourses[ui.category.value];
+  ui.lessonPage.replaceChildren();
+  for (const [index, page] of course.pages.entries()) {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = `Bài ${index + 1}/${course.pages.length} · câu ${index * 10 + 1}–${index * 10 + page.items.length}`;
+    ui.lessonPage.append(option);
+  }
+  ui.lessonPage.value = String(
+    Math.min(
+      Number(pageChoices[ui.category.value]) || 0,
+      Math.max(0, course.pages.length - 1),
+    ),
+  );
+}
 try {
   courseProgress =
     JSON.parse(localStorage.getItem("echoFlightCourseProgress")) || {};
@@ -314,7 +396,8 @@ function cancel() {
   game.gen++;
   clearTimeout(game.timer);
   game.timer = null;
-  audio.cancel();
+  if (game.drill) game.drill.pause();
+  else audio.cancel();
 }
 function normal(s) {
   return s
@@ -374,6 +457,9 @@ function setSubject(key) {
   reflex.disabled = !meta.spell;
   memory.disabled = !meta.spell;
   if (!meta.spell) ui.learning.value = "phrase";
+  if (meta.stream) ui.learning.value = "reflex";
+  ui.learning.disabled = !!meta.stream;
+  populatePages();
   ui.topicInfo.querySelector("strong").textContent = meta.name;
   ui.topicInfo.querySelector("small").textContent = meta.hint;
   studyChanged();
@@ -386,6 +472,9 @@ function studyChanged() {
     phrase: "Nghe thông tin, nhập cả đáp án và nhấn Enter.",
     memory: "Nghe cả từ và phần đánh vần, rồi nhập lại khi đọc xong.",
   }[ui.learning.value];
+  if (currentSubject().stream)
+    ui.studyDescription.textContent =
+      "Chuỗi ngẫu nhiên liên tục. Mỗi âm là một mục tiêu; gõ ngay khi nghe.";
   ui.prompt.textContent = currentSubject().hint;
   ui.answer.placeholder =
     ui.learning.value === "reflex"
@@ -396,9 +485,12 @@ function studyChanged() {
 }
 function lock(playing) {
   ui.mode.disabled = playing;
-  ui.studyPlan.disabled = playing || ui.mode.value === "survival";
+  ui.studyPlan.disabled =
+    playing || !!currentSubject().stream || ui.mode.value === "survival";
+  ui.lessonPage.disabled = playing;
+  ui.drillLength.disabled = playing || ui.mode.value === "survival";
   ui.category.disabled = playing;
-  ui.learning.disabled = playing;
+  ui.learning.disabled = playing || !!currentSubject().stream;
   ui.difficulty.disabled = playing || ui.mode.value === "practice";
   ui.voice.disabled = playing;
   ui.previewVoice.disabled = playing;
@@ -411,7 +503,14 @@ function lock(playing) {
 function slots() {
   ui.slots.replaceChildren();
   const next = game.events.find((e) => !e.resolved);
-  for (const ev of game.events) {
+  const pendingIndex = game.events.findIndex((e) => !e.resolved);
+  const visible = game.drill
+    ? game.events.slice(
+        Math.max(0, (pendingIndex < 0 ? game.events.length : pendingIndex) - 8),
+        pendingIndex < 0 ? undefined : pendingIndex + 16,
+      )
+    : game.events;
+  for (const ev of visible) {
     const cell = document.createElement("span");
     cell.className =
       "slot" +
@@ -432,9 +531,11 @@ function slots() {
     ui.slots.append(cell);
   }
   ui.slotCount.textContent =
-    game.events.filter((e) => e.resolved).length +
+    (game.drill
+      ? game.hits + game.misses
+      : game.events.filter((e) => e.resolved).length) +
     " / " +
-    game.events.length +
+    (game.drill ? (game.drill.total ?? "∞") : game.events.length) +
     (game.learning === "reflex" ? " ký tự" : " mục tiêu");
 }
 function hud() {
@@ -448,54 +549,36 @@ function hud() {
     phrase: "NGHE CẢ CỤM",
     memory: "GHI NHỚ",
   }[game.learning];
-  ui.waveLabel.textContent =
-    "CÂU " +
-    game.round +
-    (game.mode === "survival" ? " / ∞" : " / " + game.roundLimit);
+  ui.waveLabel.textContent = game.drill
+    ? "TÍN HIỆU " +
+      (game.hits + game.misses) +
+      " / " +
+      (game.drill.total ?? "∞")
+    : "CÂU " +
+      game.round +
+      (game.mode === "survival" ? " / ∞" : " / " + game.roundLimit);
   slots();
   updateProgress();
 }
 function updateProgress() {
-  const count = (game.results || []).length;
-  const total = game.roundLimit || 10;
-  ui.missionProgress.hidden = game.mode === "survival";
+  const count = game.drill
+    ? game.hits + game.misses
+    : (game.results || []).length;
+  const total = game.drill ? game.drill.total || 1 : game.roundLimit || 10;
+  ui.missionProgress.hidden = game.drill
+    ? game.drill.total === null
+    : game.mode === "survival";
   ui.missionProgress.setAttribute("aria-valuemax", String(total));
   ui.missionProgress.setAttribute("aria-valuenow", String(count));
   ui.missionProgress.setAttribute(
     "aria-valuetext",
-    `${count}/${total} câu hoàn thành`,
+    `${count}/${total} ${game.drill ? "ký tự" : "câu"} hoàn thành`,
   );
   ui.progressFill.style.transform = `scaleX(${Math.min(1, count / total)})`;
 }
 function selection() {
   if (game.deck && game.deck.length) return game.deck[game.round];
-  if (game.category === "phone") {
-    let answer = "07";
-    for (let i = 0; i < 9; i++) answer += Math.floor(Math.random() * 10);
-    const words = [
-      "zero",
-      "one",
-      "two",
-      "three",
-      "four",
-      "five",
-      "six",
-      "seven",
-      "eight",
-      "nine",
-    ];
-    return {
-      answer,
-      spoken: answer
-        .split("")
-        .map((d) => words[+d])
-        .join(" "),
-      spell: false,
-    };
-  }
-  const key = game.category === "addresses" ? "numbers" : game.category;
-  const bank = EchoLessons[key];
-  return bank[Math.floor(Math.random() * bank.length)];
+  return questionBag.pick(game.category, EchoCourses[game.category].bank);
 }
 async function start(reviewDeck = null) {
   cancel();
@@ -503,15 +586,20 @@ async function start(reviewDeck = null) {
   audio.setVoice(ui.voice.value);
   const maxHealth = difficulties[ui.difficulty.value].health;
   const reviewing = Array.isArray(reviewDeck);
-  const course = reviewing
-    ? "review"
-    : ui.mode.value !== "survival" && ui.studyPlan.value === "series"
-      ? "series"
-      : "random";
+  const stream = currentSubject().stream;
+  const course = stream
+    ? "stream"
+    : reviewing
+      ? "review"
+      : ui.mode.value !== "survival" && ui.studyPlan.value === "series"
+        ? "series"
+        : "random";
   const deck = reviewing
     ? reviewDeck.map((item) => ({ ...item }))
     : course === "series"
-      ? EchoCourses[ui.category.value].items.map((item) => ({ ...item }))
+      ? EchoCourses[ui.category.value].pages[pageIndex()].items.map((item) => ({
+          ...item,
+        }))
       : [];
   game = {
     running: true,
@@ -526,12 +614,14 @@ async function start(reviewDeck = null) {
     events: [],
     results: [],
     course,
+    page: pageIndex(),
+    drillStats: {},
     deck,
     roundLimit: deck.length || 5,
     timer: null,
     mode: ui.mode.value,
     category: ui.category.value,
-    learning: ui.learning.value,
+    learning: stream ? "reflex" : ui.learning.value,
     speed: Number(ui.pace.value),
     hits: 0,
     misses: 0,
@@ -545,9 +635,70 @@ async function start(reviewDeck = null) {
   const gen = game.gen;
   try {
     await audio.ready();
-    if (gen === game.gen && game.running) nextRound();
+    if (gen === game.gen && game.running) {
+      if (stream) await startDrill(stream);
+      else nextRound();
+    }
   } catch (_) {
-    audioFailure();
+    if (gen === game.gen && game.running) audioFailure();
+  }
+}
+async function startDrill(kind) {
+  const session = game;
+  const total =
+    game.mode === "survival" || ui.drillLength.value === "endless"
+      ? null
+      : Number(ui.drillLength.value) || 120;
+  game.drill = new EchoDrills.CharacterDrill(audio, {
+    kind,
+    total,
+    speed: game.speed,
+    onChange: () => {
+      if (game === session && game.running) hud();
+    },
+    onError: () => {
+      if (game === session && game.running) audioFailure();
+    },
+  });
+  game.events = game.drill.events;
+  ui.answer.value = "";
+  ui.answer.inputMode = kind === "digits" ? "numeric" : "text";
+  ui.targetKind.textContent =
+    kind === "letters" ? "A–Z / LETTER STREAM" : "0–9 / NUMBER STREAM";
+  ui.prompt.textContent =
+    kind === "letters"
+      ? "Chỉ chữ cái · nghe và gõ ngay"
+      : "Chỉ chữ số · nghe và gõ ngay";
+  hud();
+  if (await game.drill.start()) {
+    if (game !== session || !game.running || game.paused) return;
+    game.phase = "playing";
+    ui.signal.textContent = "♪ Tín hiệu liên tục";
+    ui.spaceState.textContent = "CONTINUOUS SIGNAL / LIVE";
+    status(
+      "Không cần Enter · gõ từng " +
+        (kind === "letters" ? "chữ cái" : "chữ số") +
+        " vừa nghe.",
+    );
+    ui.answer.focus();
+  }
+}
+function characterResult(event, correct) {
+  if (!game.drill) return;
+  const stats = (game.drillStats[event.char] ??= { hits: 0, misses: 0 });
+  stats[correct ? "hits" : "misses"]++;
+}
+async function resumeDrill() {
+  const session = game,
+    gen = game.gen;
+  game.phase = "loading";
+  if (await game.drill.resume()) {
+    if (game !== session || gen !== game.gen || !game.running || game.paused)
+      return;
+    game.phase = "playing";
+    ui.signal.textContent = "♪ Tín hiệu liên tục";
+    status("Tiếp tục từ ký tự chưa gõ · " + speedLevels[game.speed].name + ".");
+    hud();
   }
 }
 function later(fn, delay) {
@@ -728,6 +879,7 @@ function tick(now) {
       ev.resolved = true;
       ev.correct = false;
       game.misses++;
+      characterResult(ev, false);
       game.combo = 0;
       if (game.mode !== "practice") game.health = Math.max(0, game.health - 1);
       renderer.impact();
@@ -742,12 +894,24 @@ function tick(now) {
       changed = true;
       if (game.health === 0) {
         hud();
-        finish("NHIỆM VỤ KẾT THÚC", "Đáp án: " + game.text);
+        finish(
+          "NHIỆM VỤ KẾT THÚC",
+          game.drill ? "Tín hiệu vừa lỡ: " + ev.char : "Đáp án: " + game.text,
+        );
         return;
       }
     }
   }
   if (changed) hud();
+  if (game.drill) {
+    game.drill.maintain(now);
+    if (game.drill.complete)
+      finish(
+        "HOÀN THÀNH CHUỖI",
+        "Đã luyện " + game.drill.total + " ký tự liên tiếp.",
+      );
+    return;
+  }
   if (now >= game.lastDeadline + 250) roundComplete();
 }
 function type(raw, commit = false) {
@@ -778,6 +942,7 @@ function type(raw, commit = false) {
   ev.resolved = true;
   ev.correct = true;
   game.hits++;
+  characterResult(ev, true);
   game.combo++;
   game.score +=
     (reflex ? 10 : 50) + Math.min(20, Math.floor((game.combo - 1) / 4) * 2);
@@ -792,6 +957,7 @@ function type(raw, commit = false) {
   }
 }
 function recordRound() {
+  if (game.drill) return;
   if (
     !game.results ||
     !game.item ||
@@ -823,6 +989,37 @@ function roundComplete() {
   else proceed();
 }
 function showResults() {
+  ui.retryMistakes.hidden = !!game.drill;
+  ui.replayLesson.textContent = game.drill
+    ? "Luyện chuỗi mới ↻"
+    : "Học lại bài này";
+  ui.nextLesson.hidden =
+    !!game.drill ||
+    game.course !== "series" ||
+    game.page + 1 >= EchoCourses[game.category].pages.length;
+  if (game.drill) {
+    lastMistakes = [];
+    const count = game.hits + game.misses;
+    ui.resultsTitle.textContent =
+      EchoCourses[game.category].title + " · Kết quả";
+    ui.resultsScore.textContent = count
+      ? Math.round((game.hits / count) * 100) + "%"
+      : "—";
+    ui.resultsSummary.textContent = `${count} ký tự đã nghe · ${game.hits} đúng · ${game.misses} bỏ lỡ. Chuỗi tiếp theo sẽ được tạo mới.`;
+    ui.resultsList.replaceChildren();
+    for (const [char, stats] of Object.entries(game.drillStats).sort(
+      (a, b) => b[1].misses - a[1].misses || a[0].localeCompare(b[0]),
+    )) {
+      const li = document.createElement("li");
+      li.className = stats.misses ? "incorrect" : "correct";
+      li.textContent =
+        `${char} · ${stats.hits}/${stats.hits + stats.misses} đúng` +
+        (stats.misses ? ` · lỡ ${stats.misses}` : "");
+      ui.resultsList.append(li);
+    }
+    ui.lessonResults.hidden = !count;
+    return;
+  }
   const results = game.results || [],
     correct = results.filter((r) => r.correct).length;
   lastMistakes = results.filter((r) => !r.correct).map((r) => ({ ...r.item }));
@@ -868,7 +1065,7 @@ function showResults() {
     game.round >= game.roundLimit &&
     results.length === game.roundLimit
   ) {
-    const key = game.category + ":" + game.learning;
+    const key = progressKey(game.category, game.learning, game.page);
     const previous = courseProgress[key];
     courseProgress[key] = {
       bestCorrect: Math.max(previous ? previous.bestCorrect : 0, correct),
@@ -933,7 +1130,8 @@ function pause() {
     ui.answer.disabled = false;
     ui.fire.disabled = false;
     ui.answer.focus();
-    if (game.resumePhase === "between") nextRound();
+    if (game.drill) resumeDrill();
+    else if (game.resumePhase === "between") nextRound();
     else if (game.events.length && game.resumeIndex >= game.events.length) {
       game.phase = "playing";
       roundComplete();
@@ -947,6 +1145,11 @@ function pause() {
 }
 function replay() {
   if (!game.running || game.paused || game.phase === "between") return;
+  if (game.drill) {
+    cancel();
+    resumeDrill();
+    return;
+  }
   const from = game.events.findIndex((e) => !e.resolved);
   cancel();
   if (game.learning === "reflex" && game.events.length && from >= 0)
@@ -961,6 +1164,15 @@ function speed(value) {
   const selected = Object.hasOwn(speedLevels, requested) ? requested : 100;
   ui.pace.value = String(selected);
   ui.paceDescription.textContent = speedLevels[selected].description;
+  if (game.running && game.drill) {
+    game.speed = selected;
+    game.drill.speed = selected;
+    if (!game.paused) {
+      cancel();
+      resumeDrill();
+    }
+    return;
+  }
   if (game.running)
     status(
       "Nhịp " +
@@ -974,7 +1186,8 @@ subjects.forEach((subject, i) => {
   option.textContent = subject.name;
   ui.category.append(option);
   const button = document.createElement("button");
-  button.className = "subject-button";
+  button.className =
+    "subject-button" + (subject.stream ? " stream-subject" : "");
   button.dataset.key = subject.key;
   const num = document.createElement("span");
   num.textContent = String(i + 1).padStart(2, "0");
@@ -989,6 +1202,25 @@ ui.help.addEventListener("click", () => {
   ui.helpDialog.showModal();
 });
 ui.studyPlan.addEventListener("change", describeMode);
+ui.drillLength.addEventListener("change", describeMode);
+ui.lessonPage.addEventListener("change", () => {
+  pageChoices[ui.category.value] = pageIndex();
+  try {
+    localStorage.setItem("echoFlightPageChoices", JSON.stringify(pageChoices));
+  } catch (_) {}
+  updateLessonNote();
+});
+ui.nextLesson.addEventListener("click", () => {
+  const course = EchoCourses[ui.category.value];
+  if (game.course !== "series" || game.page + 1 >= course.pages.length) return;
+  ui.lessonPage.value = String(game.page + 1);
+  pageChoices[ui.category.value] = pageIndex();
+  try {
+    localStorage.setItem("echoFlightPageChoices", JSON.stringify(pageChoices));
+  } catch (_) {}
+  updateLessonNote();
+  start();
+});
 ui.retryMistakes.addEventListener("click", () => {
   if (!lastMistakes.length) return;
   ui.mode.value = "practice";

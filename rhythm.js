@@ -7,7 +7,7 @@
     word: 1.1,
     flight: 0.95,
   };
-  function pattern(text, speed = 100) {
+  function pattern(text, speed = 100, options = {}) {
     const rate = speed / 100;
     const events = [];
     let at = 0,
@@ -27,8 +27,14 @@
       at +=
         (ch === "W" ? 0.56 : /\d/.test(ch) ? BASE.digit : BASE.letter) / rate;
       const next = tokens[i + 1];
-      if (count === 4 && next && /[A-Z0-9]/.test(next)) {
-        at += BASE.group / rate;
+      const groupSize = options.groupSize ?? 4;
+      if (
+        groupSize > 0 &&
+        count === groupSize &&
+        next &&
+        /[A-Z0-9]/.test(next)
+      ) {
+        at += (options.groupPause ?? BASE.group) / rate;
         count = 0;
       }
     }
@@ -79,19 +85,31 @@
       );
       return bucket;
     }
-    async play(text, speed = 100, lead = 0.2) {
+    async play(text, speed = 100, lead = 0.2, options = {}) {
       const generation = ++this.epoch;
       const voice = this.voice;
       const bucket = await this.prepare(text, speed);
       if (generation !== this.epoch) return null;
-      const p = pattern(text, speed);
-      const audioStart = this.context.currentTime + lead;
-      const wallStart = performance.now() + lead * 1000;
+      const p = pattern(text, speed, options);
+      const scheduled =
+        options.startAt &&
+        options.startAt.audio >= this.context.currentTime + 0.03;
+      const delay = Math.max(0.15, lead);
+      const audioStart = scheduled
+        ? options.startAt.audio
+        : this.context.currentTime + delay;
+      const wallStart = scheduled
+        ? options.startAt.wall
+        : performance.now() + delay * 1000;
       for (const ev of p.events) {
         const source = this.context.createBufferSource();
         source.buffer = this.cache.get(`${voice}:${ev.char}:${bucket}`);
         source.playbackRate.value = 1;
         source.connect(this.context.destination);
+        source.onended = () => {
+          const index = this.sources.indexOf(source);
+          if (index >= 0) this.sources.splice(index, 1);
+        };
         source.start(audioStart + ev.offset);
         this.sources.push(source);
       }
@@ -104,6 +122,10 @@
         })),
         duration: p.duration * 1000,
         wallStart,
+        nextStart: {
+          audio: audioStart + p.duration,
+          wall: wallStart + p.duration * 1000,
+        },
       };
     }
     narrate(text, speed = 100) {
