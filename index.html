@@ -36,7 +36,11 @@
             <h1>Bắt tín hiệu. <em>Làm chủ không gian.</em></h1>
             <p>Nghe đến đâu, gõ đến đó. Mỗi ký tự đúng là một phát bắn.</p>
           </div>
-          <button class="outline" id="fullscreen">⛶ Toàn màn hình</button>
+          <div class="heading-actions">
+            <button id="bossChallenge" class="boss-launch" type="button">
+              Boss cuối · Tổng hợp →</button
+            ><button class="outline" id="fullscreen">⛶ Toàn màn hình</button>
+          </div>
         </div>
         <div
           class="subject-nav"
@@ -99,6 +103,11 @@
                 >
                   ↻ Chơi lại
                 </button>
+                <div id="bossHud" class="boss-hud" hidden>
+                  <span id="bossPhase">VOID LEVIATHAN · PHA 1</span
+                  ><strong id="bossHealth">10 / 10</strong>
+                  <div class="boss-health-track"><div id="bossFill"></div></div>
+                </div>
                 <div class="signal" id="signal" hidden>
                   Sẵn sàng bắt tín hiệu
                 </div>
@@ -126,6 +135,10 @@
                 ><small id="moneyHint"
                   >Ký hiệu £ đã có sẵn. Chỉ nhập số tiền.</small
                 >
+              </div>
+              <div id="timeQuestion" class="time-question" hidden>
+                <strong id="timeInstruction"></strong
+                ><small id="timeHint"></small>
               </div>
               <label class="input-label" for="answer">BỘ NHẬN TÍN HIỆU</label>
               <div class="input-row">
@@ -180,6 +193,9 @@
               <p id="resultsSummary"></p>
               <ol id="resultsList"></ol>
               <div class="results-actions">
+                <button id="bossAfterLesson" class="boss-launch" hidden>
+                  Thử boss cuối · Tổng hợp →
+                </button>
                 <button id="nextLesson" class="launch" hidden>
                   Bài tiếp theo →
                 </button>
@@ -249,6 +265,19 @@
                 <p class="sub" id="lessonNote"></p>
                 <p class="sub" id="studyDescription"></p>
               </div>
+              <div
+                id="answerPolicyWrap"
+                class="field field-wide settings-group"
+                hidden
+              >
+                <label for="answerPolicy">CÁCH CHẤM NGÀY & GIỜ</label
+                ><select id="answerPolicy">
+                  <option value="flexible" selected>
+                    Micro-skill · linh hoạt
+                  </option>
+                  <option value="strict">Theo giới hạn câu hỏi</option>
+                </select>
+              </div>
               <div class="settings-group pace-group">
                 <label for="pace">TỐC ĐỘ ĐỌC</label>
                 <div class="pace-controls">
@@ -299,7 +328,14 @@
                 <div class="voice-controls">
                   <select id="voice">
                     <option value="sonia">Sonia · nữ · Anh</option>
-                    <option value="ryan">Ryan · nam · Anh</option></select
+                    <option value="ryan">Ryan · nam · Anh</option>
+                    <option value="jenny">Jenny · nữ · Mỹ</option>
+                    <option value="guy">Guy · nam · Mỹ</option>
+                    <option value="natasha">Natasha · nữ · Úc</option>
+                    <option value="william">William · nam · Úc</option>
+                    <option value="molly">
+                      Molly · nữ · New Zealand
+                    </option></select
                   ><button
                     type="button"
                     id="previewVoice"
@@ -333,6 +369,20 @@
                 </p>
               </details>
               <div class="best-line">
+                <details class="ielts-reference">
+                  <summary>Xem thêm về IELTS Listening</summary>
+                  <p>
+                    Đối chiếu dạng câu hỏi, giới hạn từ và cách làm bài trên
+                    trang chính thức.
+                  </p>
+                  <a
+                    class="reference-link"
+                    href="https://ielts.org/take-a-test/test-types/ielts-academic-test/ielts-academic-format-listening"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Hướng dẫn IELTS chính thức ↗</a
+                  >
+                </details>
                 <span>KỶ LỤC</span><strong id="best">0000</strong>
               </div>
             </section>
@@ -387,6 +437,9 @@
     <script src="voice-ryan.js"></script>
     <script src="voice-sonia-extra.js"></script>
     <script src="voice-ryan-extra.js"></script>
+    <script src="voices.js"></script>
+    <script src="answers.js"></script>
+    <script src="boss.js"></script>
     <script src="rhythm.js"></script>
     <script src="drills.js"></script>
     <script src="space.js"></script>

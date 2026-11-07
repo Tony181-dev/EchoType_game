@@ -119,6 +119,17 @@ const ids = [
   "moneyHint",
   "answerCurrency",
   "currencyKey",
+  "bossChallenge",
+  "bossAfterLesson",
+  "bossHud",
+  "bossHealth",
+  "bossFill",
+  "bossPhase",
+  "answerPolicy",
+  "answerPolicyWrap",
+  "timeQuestion",
+  "timeInstruction",
+  "timeHint",
 ];
 const elements = Object.fromEntries(ids.map((id) => [id, new Element(id)]));
 elements.learning.options = [new Element(), new Element(), new Element()];
@@ -130,6 +141,7 @@ elements.voice.value = "sonia";
 elements.pace.value = "100";
 elements.drillLength.value = "120";
 elements.moneyFormat.value = "provided";
+elements.answerPolicy.value = "flexible";
 let now = 0,
   jobs = [],
   jobId = 0,
@@ -192,6 +204,9 @@ const c = {
     impact() {
       damages++;
     }
+    bossAttack() {
+      damages++;
+    }
     wrong() {}
   },
   setTimeout(fn, delay) {
@@ -216,6 +231,9 @@ for (const f of [
   "questions.js",
   "rhythm.js",
   "drills.js",
+  "answers.js",
+  "boss.js",
+  "voices.js",
 ])
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), c);
 c.EchoRhythm.RhythmAudio = class {
@@ -248,6 +266,7 @@ c.EchoRhythm.RhythmAudio = class {
     };
   }
 };
+c.EchoVoiceCatalog.ensure = async () => {};
 vm.runInContext(fs.readFileSync(path.join(root, "game.js"), "utf8"), c);
 const e = (source) => vm.runInContext(source, c);
 const flush = () => new Promise((r) => setImmediate(r));
@@ -344,13 +363,13 @@ const flush = () => new Promise((r) => setImmediate(r));
     }
   }
   elements.voice.value = "ryan";
-  e("configureVoice()");
+  await e("configureVoice()");
   assert.equal(e("audio.voice"), "ryan");
   elements.voice.value = "sonia";
-  e("configureVoice()");
+  await e("configureVoice()");
   assert.equal(e("audio.voice"), "sonia");
   for (const course of Object.values(c.EchoCourses)) {
-    if (course.stream) continue;
+    if (course.stream || course.boss) continue;
     assert.equal(course.items.length, 10);
     assert.equal(
       new Set(course.items.map((i) => i.answer)).size,
@@ -585,6 +604,76 @@ const flush = () => new Promise((r) => setImmediate(r));
   e("restorePreferences()");
   assert.equal(elements.difficulty.value, "medium");
   assert.equal(elements.voice.value, "ryan");
+  e("setSubject('boss')");
+  elements.difficulty.value = "medium";
+  elements.pace.value = "100";
+  elements.answerPolicy.value = "flexible";
+  await e("start()");
+  assert.equal(e("game.boss.health"), 10);
+  assert.equal(e("game.mode"), "mission");
+  assert.equal(elements.bossHud.hidden, false);
+  elements.answer.value = "unfinished";
+  e("makeWholeTarget()");
+  assert.equal(e("game.health"), 6, "A draft is not submitted before Enter");
+  const bossDeadline = e("game.lastDeadline");
+  e("pause()");
+  advance(5000);
+  e("tick(performance.now())");
+  e("pause()");
+  assert.equal(
+    e("game.lastDeadline"),
+    bossDeadline + 5000,
+    "Pause preserves remaining boss response time",
+  );
+  e("type('definitely wrong',true)");
+  assert.equal(e("game.health"), 5);
+  assert.equal(e("game.misses"), 1);
+  e("type('definitely wrong',true)");
+  assert.equal(
+    e("game.health"),
+    5,
+    "Repeated input cannot apply the boss attack twice",
+  );
+  advance(251);
+  e("tick(performance.now())");
+  advance(1801);
+  await flush();
+  for (let hp = 9; hp >= 0; hp--) {
+    e("makeWholeTarget()");
+    const reply = e(
+      "game.itemCategory==='money'?game.text.replace('£',''):game.text",
+    );
+    e("type(" + JSON.stringify(reply) + ",true)");
+    assert.equal(e("game.boss.health"), hp);
+    assert.equal(e("game.health"), 5);
+    advance(251);
+    e("tick(performance.now())");
+    advance(1801);
+    await flush();
+  }
+  assert.equal(e("game.running"), false);
+  assert.equal(elements.missionLabel.textContent, "BOSS ĐÃ BỊ HẠ!");
+  assert.equal(e("game.hits"), 10);
+  assert.equal(elements.resultsScore.textContent, "10 / 10");
+  assert.equal(elements.retryMistakes.hidden, true);
+  elements.difficulty.value = "hard";
+  await e("start()");
+  for (let i = 0; i < 3; i++) {
+    e("makeWholeTarget()");
+    e("type('wrong',true)");
+    if (i < 2) {
+      advance(251);
+      e("tick(performance.now())");
+      advance(1801);
+      await flush();
+    }
+  }
+  assert.equal(e("game.running"), false);
+  assert.equal(e("game.health"), 0);
+  assert.equal(elements.missionLabel.textContent, "BOSS ĐÃ THẮNG");
+  e("setSubject('streets')");
+  assert.equal(e("game.boss"), null);
+  assert.equal(elements.bossHud.hidden, true);
   console.log(
     "Passed: audio rhythm scaling, whole word before spelling, all subjects, scoring/health, pause/resume, phrase answers, speed presets, voices, multi-page lessons, saved progress, mistake review and isolated finite/endless character sessions.",
   );

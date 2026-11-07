@@ -68,6 +68,12 @@ Real IELTS answers depend on the actual question and word limit. [IDP's punctuat
 
 Fractional prices use a full stop and two decimal places, following IDP's recommended format: `15.50`, rather than `15,50` or `15.5`. Whole amounts such as `50` are also accepted.
 
+### Dates, times and official guidance
+
+**Micro-skill · flexible** compares the meaning: `half past six`, `six thirty`, `6:30` and `06.30` match; `13 March`, `March 13th` and `the thirteenth of March` match. Ambiguous numeric dates such as `03/04` need a month name. **Follow question limits** shows a practice instruction and checks it as well: clock times require a numeric response, and dates allow up to three words and/or a number. The flexible mode builds listening accuracy; the instructions on a real IELTS question determine which answer forms fit it.
+
+Open **Xem thêm về IELTS Listening** in the settings to read the [official IELTS Listening format](https://ielts.org/take-a-test/test-types/ielts-academic-test/ielts-academic-format-listening). It covers the four parts, question types, answer limits, and British, Australian, New Zealand and North American accents. [IDP's number guide](https://ielts.idp.com/prepare/article-fixing-common-punctuation-and-number-mistakes//) also illustrates equivalent numeric time punctuation such as a colon and a full stop.
+
 ### Choose your challenge
 
 | Difficulty       | Health |
@@ -78,11 +84,17 @@ Fractional prices use a full stop and two decimal places, following IDP's recomm
 
 Difficulty changes health independently from reading speed. **Practice** never loses health. **Mission** ends when the lesson is complete or health runs out. **Survival** continues until health runs out.
 
+### Final boss: Void Leviathan
+
+![Void Leviathan boss fight](docs/boss.jpg)
+
+Launch **Boss cuối · Tổng hợp** from the heading or a completed lesson's report. The boss has ten health and three visual phases. The deck rotates through all ten topic categories, shuffled each cycle. Hear each question once (including spelling where appropriate), then submit one complete answer. Each correct submission fires one laser and removes one boss health; a wrong submission or timeout launches one counterattack and removes one player shield. The fight ends when either side runs out of health.
+
 Reading speed has six named levels: Very slow, Slow, Normal, Fast, Very fast and Turbo. Changes apply from the next question in topic lessons, and immediately in continuous character training. Normal uses roughly 0.36 seconds between ordinary letters, with pauses between groups and words in topic lessons; W has extra articulation time.
 
 ### Consistent speech
 
-Choose **Sonia** (female, British English) or **Ryan** (male, British English), and use Preview voice to compare them. Whole words, letters and digits always use the selected neural voice. Audio variants preserve pitch at each supported speed. The game plays local audio, rather than requesting an online speech service during play.
+Choose from **seven neural voices across four accents**: Sonia and Ryan (UK), Jenny and Guy (US), Natasha and William (Australia), and Molly (New Zealand). Preview voice lets you compare them. Whole words, letters and digits use the same selected voice. The additional banks load from the local game files only when chosen, and audio variants preserve pitch. Playback makes no requests to a speech service.
 
 The lesson format and cadence were informed by [this IELTS street-name listening reference](https://www.youtube.com/watch?v=QrOmh-IfGg4&t=208s). Lesson content is the game's own practice material. The reference video's audio is not included, and the original speaker's voice is not cloned.
 
@@ -107,12 +119,12 @@ npm test
 npm run format:check
 ```
 
-| Tests                     | Coverage                                                                                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/game.test.cjs`     | Ordered lessons, scoring, health boundaries, answer formats, pause/help, preferences, progress and mistake review                                                                                 |
-| `tests/drills.test.cjs`   | Strict character sets, finite goals, 24,000+ endless characters, bounded memory, pause/speed, no-repeat draws and all 42 lessons                                                                  |
-| `tests/audio.test.cjs`    | 504 non-silent letter/digit clips, 780 phrases, full coverage, non-overlapping drill speech, continuous scheduling, source cleanup, cancellation and voice isolation during asynchronous decoding |
-| `tests/renderer.test.cjs` | Delayed-frame explosions, single hit resolution, consistent steering, pause and reduced effects                                                                                                   |
+| Tests                     | Coverage                                                                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/game.test.cjs`     | Ordered lessons, scoring, health boundaries, answer formats, pause/help, preferences, progress and mistake review                              |
+| `tests/drills.test.cjs`   | Strict character sets, finite goals, 24,000+ endless characters, bounded memory, pause/speed, no-repeat draws and all 42 lessons               |
+| `tests/audio.test.cjs`    | 1,764 letter/digit clips and 2,730 phrases across seven voices, non-overlapping drill speech, source cleanup, cancellation and voice isolation |
+| `tests/renderer.test.cjs` | Delayed-frame explosions, single hit resolution, consistent steering, pause and reduced effects                                                |
 
 `npm run format` formats source files. GitHub Actions runs the same checks for pushes and pull requests. Browser checks cover real playback progress, both voice previews, lesson scoring and the result report; automated checks do not rate perceived voice naturalness.
 

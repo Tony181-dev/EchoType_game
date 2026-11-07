@@ -5,9 +5,9 @@
   "description": "A spaceship listening arcade for English micro-skills.",
   "scripts": {
     "dev": "node scripts/serve.mjs",
-    "test": "node tests/game.test.cjs && node tests/drills.test.cjs && node tests/audio.test.cjs && node tests/renderer.test.cjs",
-    "format": "prettier --write index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js content.js questions.js drills.js tests scripts README.md package.json",
-    "format:check": "prettier --check index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js content.js questions.js drills.js tests scripts README.md package.json"
+    "test": "node tests/game.test.cjs && node tests/answers.test.cjs && node tests/boss.test.cjs && node tests/drills.test.cjs && node tests/audio.test.cjs && node tests/renderer.test.cjs",
+    "format": "prettier --write index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js content.js questions.js drills.js answers.js boss.js voices.js tests scripts README.md package.json",
+    "format:check": "prettier --check index.html classic.html style.css game.js rhythm.js space.js courses.js lessons.js content.js questions.js drills.js answers.js boss.js voices.js tests scripts README.md package.json"
   },
   "engines": {
     "node": ">=20"

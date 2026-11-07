@@ -72,8 +72,26 @@ const $ = (id) => document.getElementById(id),
   "moneyHint",
   "answerCurrency",
   "currencyKey",
+  "bossChallenge",
+  "bossAfterLesson",
+  "bossHud",
+  "bossHealth",
+  "bossFill",
+  "bossPhase",
+  "answerPolicy",
+  "answerPolicyWrap",
+  "timeQuestion",
+  "timeInstruction",
+  "timeHint",
 ].forEach((id) => (ui[id] = $(id)));
 const subjects = [
+  {
+    key: "boss",
+    name: "Boss cuối · Tổng hợp",
+    hint: "10 chủ đề luân phiên. Đúng bắn boss, sai hoặc hết giờ bị bắn trả.",
+    spell: false,
+    boss: true,
+  },
   {
     key: "letters",
     name: "Chỉ chữ cái",
@@ -189,46 +207,52 @@ function updateLessonNote() {
   const lesson = EchoCourses[ui.category.value];
   if (!lesson) return;
   const stream = !!lesson.stream;
-  ui.studyPlanWrap.hidden = stream;
+  const boss = !!currentSubject().boss;
+  ui.studyPlanWrap.hidden = stream || boss;
   ui.drillLengthWrap.hidden = !stream;
   ui.lessonPageWrap.hidden =
-    stream || ui.studyPlan.value !== "series" || ui.mode.value === "survival";
+    stream ||
+    boss ||
+    ui.studyPlan.value !== "series" ||
+    ui.mode.value === "survival";
   const key = progressKey(ui.category.value, ui.learning.value, pageIndex());
   const progress = courseProgress[key];
   const length = ui.studyPlan.value === "series" ? 10 : 5;
-  ui.lessonNote.textContent = stream
-    ? (ui.mode.value === "survival" || ui.drillLength.value === "endless"
-        ? "Chuỗi vô tận"
-        : "Chuỗi " + ui.drillLength.value + " ký tự") +
-      " · " +
-      (lesson.stream === "letters" ? "chỉ A–Z" : "chỉ 0–9") +
-      " · có khoảng nghỉ để nghe và gõ."
-    : ui.mode.value === "survival"
-      ? "Sinh tồn: rút lần lượt từ " +
-        lesson.bank.length +
-        " câu, không lặp trước khi hết lượt."
-      : ui.studyPlan.value === "series"
-        ? "Bài " +
-          (pageIndex() + 1) +
-          "/" +
-          lesson.pages.length +
-          " · " +
-          lesson.title +
-          " · " +
-          length +
-          " câu theo thứ tự." +
-          (progress
-            ? " Kết quả tốt nhất: " +
-              progress.bestCorrect +
-              "/" +
-              progress.total +
-              "."
-            : "")
-        : "Rút " +
-          length +
-          " câu từ " +
+  ui.lessonNote.textContent = boss
+    ? "Boss có 10 máu. Hạ boss bằng 10 đáp án đúng; mỗi câu sai mất 1 máu. Các chủ đề đổi luân phiên."
+    : stream
+      ? (ui.mode.value === "survival" || ui.drillLength.value === "endless"
+          ? "Chuỗi vô tận"
+          : "Chuỗi " + ui.drillLength.value + " ký tự") +
+        " · " +
+        (lesson.stream === "letters" ? "chỉ A–Z" : "chỉ 0–9") +
+        " · có khoảng nghỉ để nghe và gõ."
+      : ui.mode.value === "survival"
+        ? "Sinh tồn: rút lần lượt từ " +
           lesson.bank.length +
-          " câu · tránh lặp qua các lần chơi.";
+          " câu, không lặp trước khi hết lượt."
+        : ui.studyPlan.value === "series"
+          ? "Bài " +
+            (pageIndex() + 1) +
+            "/" +
+            lesson.pages.length +
+            " · " +
+            lesson.title +
+            " · " +
+            length +
+            " câu theo thứ tự." +
+            (progress
+              ? " Kết quả tốt nhất: " +
+                progress.bestCorrect +
+                "/" +
+                progress.total +
+                "."
+              : "")
+          : "Rút " +
+            length +
+            " câu từ " +
+            lesson.bank.length +
+            " câu · tránh lặp qua các lần chơi.";
   for (const button of ui.subjectNav.children) {
     const completed = Object.keys(courseProgress).some((k) =>
       k.startsWith(button.dataset.key + ":"),
@@ -238,6 +262,8 @@ function updateLessonNote() {
   }
 }
 function describeMode() {
+  const boss = !!currentSubject().boss;
+  if (boss) ui.mode.value = "mission";
   const stream = !!currentSubject().stream;
   const health = difficulties[ui.difficulty.value].health;
   const count = stream
@@ -259,7 +285,13 @@ function describeMode() {
           " máu."
         : "Bay liên tục đến khi hết " + health + " máu.";
   ui.studyPlan.disabled =
-    game.running || stream || ui.mode.value === "survival";
+    game.running || stream || boss || ui.mode.value === "survival";
+  ui.mode.disabled = game.running || boss;
+  if (boss)
+    ui.modeDescription.textContent =
+      "Cần 10 đáp án đúng để hạ boss · " +
+      health +
+      " máu. Sai hoặc hết giờ bị bắn trả.";
   ui.drillLength.disabled = game.running || ui.mode.value === "survival";
   ui.difficulty.disabled = game.running || ui.mode.value === "practice";
   ui.difficultyDescription.textContent =
@@ -273,18 +305,32 @@ function describeMode() {
   updateLessonNote();
 }
 let voicePreviewGeneration = 0;
-function configureVoice() {
-  voicePreviewGeneration++;
+async function configureVoice() {
+  const generation = ++voicePreviewGeneration,
+    choice = ui.voice.value;
   audio.cancel();
-  audio.setVoice(ui.voice.value);
+  try {
+    if (!window.EchoVoices?.[choice])
+      status(
+        "Đang tải giọng " + EchoVoiceCatalog.voices[choice].name + " lần đầu…",
+      );
+    await EchoVoiceCatalog.ensure(choice);
+    if (generation !== voicePreviewGeneration || game.running) return false;
+    audio.setVoice(choice);
+  } catch (_) {
+    if (generation === voicePreviewGeneration)
+      status("Chưa tải được giọng. Hãy thử chọn lại.", "bad");
+    return false;
+  }
   ui.previewVoice.disabled = game.running;
   ui.previewVoice.textContent = "▷ Nghe giọng";
   ui.previewPace.disabled = game.running;
   ui.previewPace.textContent = "▷ Nghe thử nhịp";
+  return true;
 }
 async function previewVoice() {
   if (game.running) return;
-  configureVoice();
+  if (!(await configureVoice())) return;
   const generation = voicePreviewGeneration;
   ui.previewVoice.disabled = true;
   ui.previewVoice.textContent = "Đang đọc thử…";
@@ -308,7 +354,7 @@ async function previewVoice() {
 }
 async function previewPace() {
   if (game.running || !currentSubject().stream) return;
-  configureVoice();
+  if (!(await configureVoice())) return;
   const generation = voicePreviewGeneration;
   ui.previewPace.disabled = true;
   ui.previewPace.textContent = "Đang đọc thử…";
@@ -348,6 +394,7 @@ function savePreferences() {
     "voice",
     "drillLength",
     "moneyFormat",
+    "answerPolicy",
   ])
     settings[id] = ui[id].value;
   try {
@@ -366,7 +413,8 @@ function restorePreferences() {
     category: subjects.map((s) => s.key),
     learning: ["reflex", "phrase", "memory"],
     pace: Object.keys(speedLevels),
-    voice: ["sonia", "ryan"],
+    voice: Object.keys(EchoVoiceCatalog.voices),
+    answerPolicy: ["flexible", "strict"],
     drillLength: ["60", "120", "240", "endless"],
     moneyFormat: ["provided", "required"],
   };
@@ -456,9 +504,13 @@ function normal(s) {
 function answersMatch(
   value,
   expected,
-  category = game.category,
+  category = game.itemCategory || game.category,
   moneyFormat = game.moneyFormat || "provided",
 ) {
+  if (category === "time")
+    return EchoAnswers.matches(value, expected, {
+      strict: game.answerPolicy === "strict",
+    });
   if (category === "phone")
     return (
       /^[+\d\s().-]+$/.test(value.trim()) &&
@@ -504,6 +556,17 @@ function setSubject(key) {
   ui.lessonResults.hidden = true;
   ui.category.value = key;
   const meta = currentSubject();
+  game.boss = meta.boss ? EchoBoss.create() : null;
+  ui.bossHud.hidden = !meta.boss;
+  if (meta.boss) {
+    ui.mode.value = "mission";
+    ui.learning.value = "phrase";
+    ui.noticeTitle.textContent = "VOID LEVIATHAN";
+    ui.noticeDetail.textContent = meta.hint;
+    ui.introNotice.classList.remove("hidden");
+    ui.signal.hidden = true;
+    updateBossHud();
+  }
   if (game.round || game.drill) {
     ui.noticeTitle.textContent = "Sẵn sàng bắt tín hiệu?";
     ui.noticeDetail.textContent = meta.hint;
@@ -520,7 +583,11 @@ function setSubject(key) {
   if (!meta.spell) ui.learning.value = "phrase";
   if (meta.stream) ui.learning.value = "reflex";
   ui.learning.disabled = !!meta.stream;
-  ui.learningWrap.hidden = !!meta.stream;
+  if (meta.boss) {
+    ui.noticeTitle.textContent = "VOID LEVIATHAN";
+    ui.learning.disabled = true;
+  }
+  ui.learningWrap.hidden = !!meta.stream || !!meta.boss;
   ui.studyDescription.hidden = !!meta.stream;
   populatePages();
   ui.topicInfo.querySelector("strong").textContent = meta.name;
@@ -529,6 +596,7 @@ function setSubject(key) {
   describeMode();
   speed(ui.pace.value);
   updateMoneyQuestion();
+  updateTimeQuestion();
   savePreferences();
 }
 function studyChanged() {
@@ -540,6 +608,9 @@ function studyChanged() {
   if (currentSubject().stream)
     ui.studyDescription.textContent =
       "Chuỗi ngẫu nhiên liên tục. Mỗi âm là một mục tiêu; gõ ngay khi nghe.";
+  if (currentSubject().boss)
+    ui.studyDescription.textContent =
+      "Nghe một lượt rồi nhấn Enter. Boss chỉ tính một đáp án mỗi câu.";
   ui.prompt.textContent = currentSubject().hint;
   ui.answer.placeholder =
     ui.learning.value === "reflex"
@@ -549,9 +620,12 @@ function studyChanged() {
   updateLessonNote();
 }
 function updateMoneyQuestion() {
-  const money = ui.category.value === "money",
-    provided = ui.moneyFormat.value !== "required";
-  ui.moneyFormatWrap.hidden = !money;
+  const money =
+      (game.running && game.boss ? game.itemCategory : ui.category.value) ===
+      "money",
+    provided =
+      (game.running ? game.moneyFormat : ui.moneyFormat.value) !== "required";
+  ui.moneyFormatWrap.hidden = ui.category.value !== "money";
   ui.moneyQuestion.hidden = !money;
   ui.answerCurrency.hidden = !money || !provided;
   ui.currencyKey.hidden = !money || provided;
@@ -572,15 +646,50 @@ function updateMoneyQuestion() {
       ? "Chỉ nhập số tiền, ví dụ 15.50"
       : "Ví dụ 15.50 pounds hoặc £15.50";
 }
+function updateTimeQuestion() {
+  const category =
+    game.running && game.boss ? game.itemCategory : ui.category.value;
+  const showing = category === "time",
+    strict =
+      (game.running ? game.answerPolicy : ui.answerPolicy.value) === "strict";
+  ui.answerPolicyWrap.hidden =
+    ui.category.value !== "time" && ui.category.value !== "boss";
+  ui.timeQuestion.hidden = !showing;
+  const isDate =
+    game.running && game.item ? !!EchoAnswers.date(game.item.answer) : false;
+  ui.timeInstruction.textContent = strict
+    ? isDate
+      ? "Write NO MORE THAN THREE WORDS AND/OR A NUMBER."
+      : "Write A NUMBER."
+    : "Luyện micro-skill · chấp nhận cách ghi tương đương";
+  ui.timeHint.textContent = strict
+    ? isDate
+      ? "Điền ngày và tháng, tối đa 3 từ và/hoặc một số."
+      : "Điền giờ bằng số, ví dụ 6:30 hoặc 6.30."
+    : "Ví dụ half past six = 6:30 = 06.30. Ngày có thể viết 13 March hoặc March 13th. Đây là cách chấm linh hoạt để luyện nghe.";
+}
+function updateBossHud() {
+  if (!game.boss) return;
+  const boss = game.boss;
+  boss.phase = boss.health <= 3 ? 3 : boss.health <= 6 ? 2 : 1;
+  ui.bossHealth.textContent = boss.health + " / " + boss.maxHealth;
+  ui.bossFill.style.transform = `scaleX(${boss.health / boss.maxHealth})`;
+  ui.bossPhase.textContent = "VOID LEVIATHAN · PHA " + boss.phase;
+}
 function lock(playing) {
-  ui.mode.disabled = playing;
+  ui.mode.disabled = playing || !!currentSubject().boss;
   ui.studyPlan.disabled =
-    playing || !!currentSubject().stream || ui.mode.value === "survival";
+    playing ||
+    !!currentSubject().stream ||
+    !!currentSubject().boss ||
+    ui.mode.value === "survival";
   ui.lessonPage.disabled = playing;
   ui.moneyFormat.disabled = playing;
+  ui.answerPolicy.disabled = playing;
   ui.drillLength.disabled = playing || ui.mode.value === "survival";
   ui.category.disabled = playing;
-  ui.learning.disabled = playing || !!currentSubject().stream;
+  ui.learning.disabled =
+    playing || !!currentSubject().stream || !!currentSubject().boss;
   ui.difficulty.disabled = playing || ui.mode.value === "practice";
   ui.voice.disabled = playing;
   ui.previewVoice.disabled = playing;
@@ -590,7 +699,7 @@ function lock(playing) {
   ui.fire.disabled = !playing;
   ui.pause.disabled = !playing;
   ui.stop.disabled = !playing;
-  ui.replay.disabled = !playing;
+  ui.replay.disabled = !playing || !!game.boss;
 }
 function slots() {
   ui.slots.replaceChildren();
@@ -631,6 +740,7 @@ function slots() {
     (game.learning === "reflex" ? " ký tự" : " mục tiêu");
 }
 function hud() {
+  updateBossHud();
   ui.score.textContent = String(game.score).padStart(4, "0");
   ui.combo.textContent = "×" + game.combo;
   ui.health.textContent =
@@ -641,22 +751,30 @@ function hud() {
     phrase: "NGHE CẢ CỤM",
     memory: "GHI NHỚ",
   }[game.learning];
-  ui.waveLabel.textContent = game.drill
-    ? "TÍN HIỆU " +
-      (game.hits + game.misses) +
-      " / " +
-      (game.drill.total ?? "∞")
-    : "CÂU " +
-      game.round +
-      (game.mode === "survival" ? " / ∞" : " / " + game.roundLimit);
+  ui.waveLabel.textContent = game.boss
+    ? "BOSS · CÂU " + game.round
+    : game.drill
+      ? "TÍN HIỆU " +
+        (game.hits + game.misses) +
+        " / " +
+        (game.drill.total ?? "∞")
+      : "CÂU " +
+        game.round +
+        (game.mode === "survival" ? " / ∞" : " / " + game.roundLimit);
   slots();
   updateProgress();
 }
 function updateProgress() {
-  const count = game.drill
-    ? game.hits + game.misses
-    : (game.results || []).length;
-  const total = game.drill ? game.drill.total || 1 : game.roundLimit || 10;
+  const count = game.boss
+    ? game.boss.maxHealth - game.boss.health
+    : game.drill
+      ? game.hits + game.misses
+      : (game.results || []).length;
+  const total = game.boss
+    ? game.boss.maxHealth
+    : game.drill
+      ? game.drill.total || 1
+      : game.roundLimit || 10;
   ui.missionProgress.hidden = game.drill
     ? game.drill.total === null
     : game.mode === "survival";
@@ -669,23 +787,31 @@ function updateProgress() {
   ui.progressFill.style.transform = `scaleX(${Math.min(1, count / total)})`;
 }
 function selection() {
+  if (game.boss) {
+    const item = EchoBoss.question(game.boss, game.round, questionBag);
+    game.itemCategory = item.category;
+    return item;
+  }
   if (game.deck && game.deck.length) return game.deck[game.round];
   return questionBag.pick(game.category, EchoCourses[game.category].bank);
 }
 async function start(reviewDeck = null) {
   cancel();
   voicePreviewGeneration++;
-  audio.setVoice(ui.voice.value);
+  const selectedVoice = ui.voice.value;
   const maxHealth = difficulties[ui.difficulty.value].health;
   const reviewing = Array.isArray(reviewDeck);
   const stream = currentSubject().stream;
-  const course = stream
-    ? "stream"
-    : reviewing
-      ? "review"
-      : ui.mode.value !== "survival" && ui.studyPlan.value === "series"
-        ? "series"
-        : "random";
+  const boss = !!currentSubject().boss;
+  const course = boss
+    ? "boss"
+    : stream
+      ? "stream"
+      : reviewing
+        ? "review"
+        : ui.mode.value !== "survival" && ui.studyPlan.value === "series"
+          ? "series"
+          : "random";
   const deck = reviewing
     ? reviewDeck.map((item) => ({ ...item }))
     : course === "series"
@@ -693,6 +819,7 @@ async function start(reviewDeck = null) {
           ...item,
         }))
       : [];
+  const bossState = boss ? EchoBoss.create() : null;
   game = {
     running: true,
     paused: false,
@@ -708,11 +835,13 @@ async function start(reviewDeck = null) {
     course,
     page: pageIndex(),
     drillStats: {},
-    moneyFormat: ui.moneyFormat.value || "provided",
+    moneyFormat: boss ? "provided" : ui.moneyFormat.value || "provided",
+    answerPolicy: ui.answerPolicy.value || "flexible",
+    boss: bossState,
     deck,
-    roundLimit: deck.length || 5,
+    roundLimit: bossState?.maxHealth ?? (deck.length || 5),
     timer: null,
-    mode: ui.mode.value,
+    mode: boss ? "mission" : ui.mode.value,
     category: ui.category.value,
     learning: stream ? "reflex" : ui.learning.value,
     speed: Number(ui.pace.value),
@@ -723,14 +852,19 @@ async function start(reviewDeck = null) {
   ui.lessonResults.hidden = true;
   ui.introNotice.classList.add("hidden");
   ui.signal.hidden = false;
+  ui.signal.textContent = "Chuẩn bị âm thanh…";
   ui.sceneRestart.hidden = false;
   ui.introStart.textContent = "Bắt đầu bài học →";
   ui.start.textContent = "BẮT ĐẦU LẠI ↻";
   ui.pause.textContent = "Ⅱ Tạm dừng";
   renderer.reset();
+  hud();
   const gen = game.gen;
   try {
     await audio.ready();
+    await EchoVoiceCatalog.ensure(selectedVoice);
+    if (gen !== game.gen || !game.running) return;
+    audio.setVoice(selectedVoice);
     if (gen === game.gen && game.running) {
       if (stream) await startDrill(stream);
       else nextRound();
@@ -806,7 +940,10 @@ function later(fn, delay) {
 async function narrate(text, done) {
   const gen = game.gen;
   try {
-    if (game.category === "phone" && !game.item.recorded) {
+    if (
+      (game.itemCategory || game.category) === "phone" &&
+      !game.item.recorded
+    ) {
       const plan = await audio.play(game.text, game.speed, 0.2);
       if (plan && gen === game.gen) later(done, plan.duration + 200);
     } else {
@@ -819,7 +956,11 @@ async function narrate(text, done) {
 }
 function nextRound() {
   if (!game.running || game.paused) return;
-  if (game.mode !== "survival" && game.round >= game.roundLimit) {
+  if (game.boss && game.boss.health === 0) {
+    finish("BOSS ĐÃ BỊ HẠ!", "Bạn đã thắng màn nghe tổng hợp.");
+    return;
+  }
+  if (!game.boss && game.mode !== "survival" && game.round >= game.roundLimit) {
     finish(
       "HOÀN THÀNH BÀI HỌC",
       "Bạn đã hoàn thành " + game.roundLimit + " câu.",
@@ -829,19 +970,24 @@ function nextRound() {
   cancel();
   game.item = selection();
   game.text = game.item.answer;
+  const category = game.itemCategory || game.category;
   game.round++;
   game.events = [];
   game.speed = Number(ui.pace.value);
   ui.answer.value = "";
-  ui.answer.inputMode = game.category === "phone" ? "numeric" : "text";
-  if (game.category === "money")
+  ui.answer.inputMode = category === "phone" ? "numeric" : "text";
+  ui.answer.placeholder =
+    game.learning === "reflex"
+      ? "Gõ ngay ký tự vừa nghe…"
+      : "Nhập cả đáp án rồi nhấn Enter…";
+  if (category === "money")
     ui.answer.inputMode = game.moneyFormat === "provided" ? "decimal" : "text";
-  updateMoneyQuestion();
   ui.targetKind.textContent = subjects
-    .find((s) => s.key === game.category)
+    .find((s) => s.key === category)
     .name.toUpperCase();
-  ui.prompt.textContent = subjects.find((s) => s.key === game.category).hint;
-  if (game.category === "money") updateMoneyQuestion();
+  ui.prompt.textContent = subjects.find((s) => s.key === category).hint;
+  updateMoneyQuestion();
+  updateTimeQuestion();
   hud();
   ui.answer.focus();
   playRound();
@@ -850,6 +996,25 @@ function playRound() {
   game.phase = "intro";
   ui.signal.textContent = "♪ Nghe cả cụm trước";
   status("Lắng nghe. Chưa có mục tiêu gây sát thương.");
+  if (game.boss) {
+    narrate(game.item.spoken, () => {
+      if (!game.item.spell) {
+        makeWholeTarget();
+        return;
+      }
+      later(async () => {
+        const gen = game.gen;
+        try {
+          const plan = await audio.play(game.text, game.speed, 0.3);
+          if (plan && gen === game.gen)
+            later(makeWholeTarget, plan.duration + 300);
+        } catch (_) {
+          if (gen === game.gen) audioFailure();
+        }
+      }, 700);
+    });
+    return;
+  }
   if (game.learning === "reflex") {
     if (game.category === "phone" && !game.item.recorded) {
       launchPattern(0);
@@ -924,7 +1089,7 @@ function makeWholeTarget() {
   ui.signal.textContent = "Nhập cả đáp án rồi nhấn Enter";
   ui.spaceState.textContent = "HEAVY TARGET / LOCKED";
   slots();
-  if (ui.answer.value.trim()) type(ui.answer.value, true);
+  if (!game.boss && ui.answer.value.trim()) type(ui.answer.value, true);
 }
 async function launchPattern(from) {
   if (!game.running || game.paused) return;
@@ -976,30 +1141,9 @@ function tick(now) {
   let changed = false;
   for (const ev of game.events) {
     if (!ev.resolved && now >= ev.deadline) {
-      ev.resolved = true;
-      ev.correct = false;
-      game.misses++;
-      characterResult(ev, false);
-      game.combo = 0;
-      if (game.mode !== "practice") game.health = Math.max(0, game.health - 1);
-      renderer.impact();
-      status(
-        game.mode === "practice"
-          ? "Lỡ mục tiêu — luyện tiếp nhé."
-          : "Va chạm! Mất một lớp khiên.",
-        "bad",
-      );
-      ui.signal.textContent =
-        game.mode === "practice" ? "LỠ MỤC TIÊU" : "SHIELD IMPACT";
+      missTarget(ev);
       changed = true;
-      if (game.health === 0) {
-        hud();
-        finish(
-          "NHIỆM VỤ KẾT THÚC",
-          game.drill ? "Tín hiệu vừa lỡ: " + ev.char : "Đáp án: " + game.text,
-        );
-        return;
-      }
+      if (!game.running) return;
     }
   }
   if (changed) hud();
@@ -1013,6 +1157,33 @@ function tick(now) {
     return;
   }
   if (now >= game.lastDeadline + 250) roundComplete();
+}
+function missTarget(ev) {
+  if (ev.resolved) return;
+  ev.resolved = true;
+  ev.correct = false;
+  game.misses++;
+  characterResult(ev, false);
+  game.combo = 0;
+  if (game.mode !== "practice") game.health = Math.max(0, game.health - 1);
+  if (game.boss) renderer.bossAttack(performance.now());
+  else renderer.impact();
+  status(
+    game.boss
+      ? "Boss bắn trả! Mất 1 máu."
+      : game.mode === "practice"
+        ? "Lỡ mục tiêu — luyện tiếp nhé."
+        : "Va chạm! Mất một lớp khiên.",
+    "bad",
+  );
+  ui.signal.textContent = game.boss ? "BOSS COUNTERATTACK" : "SHIELD IMPACT";
+  if (game.health === 0) {
+    hud();
+    finish(
+      game.boss ? "BOSS ĐÃ THẮNG" : "NHIỆM VỤ KẾT THÚC",
+      game.drill ? "Tín hiệu vừa lỡ: " + ev.char : "Đáp án: " + game.text,
+    );
+  }
 }
 function type(raw, commit = false) {
   if (!game.running || game.paused) return;
@@ -1035,8 +1206,14 @@ function type(raw, commit = false) {
         answersMatch(value, a),
       );
   if (!correct) {
+    if (game.boss) {
+      missTarget(ev);
+      game.lastDeadline = now;
+      if (game.running) hud();
+      return;
+    }
     status(
-      game.category === "money"
+      (game.itemCategory || game.category) === "money"
         ? game.moneyFormat === "provided"
           ? "Đề đã có £. Chỉ nhập số; giá lẻ dùng dấu chấm và hai số lẻ: 15.50."
           : "Kiểm tra số tiền, đơn vị và dạng số: £15.50 hoặc 15.50 pounds."
@@ -1049,6 +1226,14 @@ function type(raw, commit = false) {
   ev.resolved = true;
   ev.correct = true;
   game.hits++;
+  if (game.boss) {
+    game.boss.health = Math.max(0, game.boss.health - 1);
+    game.boss.hitAt = now;
+    if (!game.boss.health) {
+      renderer.burst?.(0.74, 0.52, "#d5ff69", now);
+      renderer.burst?.(0.74, 0.52, "#c18bff", now);
+    }
+  }
   characterResult(ev, true);
   game.combo++;
   game.score +=
@@ -1096,7 +1281,12 @@ function roundComplete() {
   else proceed();
 }
 function showResults() {
-  ui.retryMistakes.hidden = !!game.drill;
+  ui.retryMistakes.hidden = !!game.drill || !!game.boss;
+  ui.bossAfterLesson.hidden =
+    !!game.drill ||
+    !!game.boss ||
+    game.course !== "series" ||
+    game.results.length < game.roundLimit;
   ui.replayLesson.textContent = game.drill
     ? "Luyện chuỗi mới ↻"
     : "Học lại bài này";
@@ -1228,6 +1418,7 @@ function finish(title, detail, focusReplay = true) {
 function pause() {
   if (!game.running) return;
   if (!game.paused) {
+    game.pausedAt = performance.now();
     game.resumePhase = game.phase;
     game.resumeIndex = game.events.findIndex((e) => !e.resolved);
     if (game.resumeIndex < 0) game.resumeIndex = game.events.length;
@@ -1246,8 +1437,26 @@ function pause() {
     ui.fire.disabled = false;
     ui.currencyKey.disabled = false;
     ui.answer.focus();
+    if (!game.item && !game.drill) {
+      start(game.course === "review" ? game.deck : null);
+      return;
+    }
     if (game.drill) resumeDrill();
-    else if (game.resumePhase === "between") nextRound();
+    else if (
+      game.boss &&
+      game.resumePhase === "playing" &&
+      game.events.some((event) => !event.resolved)
+    ) {
+      const delay = performance.now() - game.pausedAt;
+      for (const event of game.events)
+        if (!event.resolved) {
+          event.born += delay;
+          event.deadline += delay;
+        }
+      game.lastDeadline += delay;
+      game.phase = "playing";
+      ui.signal.textContent = "Tiếp tục điền đáp án";
+    } else if (game.resumePhase === "between") nextRound();
     else if (game.events.length && game.resumeIndex >= game.events.length) {
       game.phase = "playing";
       roundComplete();
@@ -1260,7 +1469,8 @@ function pause() {
   }
 }
 function replay() {
-  if (!game.running || game.paused || game.phase === "between") return;
+  if (!game.running || game.paused || game.boss || game.phase === "between")
+    return;
   if (game.drill) {
     cancel();
     resumeDrill();
@@ -1319,12 +1529,13 @@ subjects.forEach((subject, i) => {
   option.value = subject.key;
   option.textContent = subject.name;
   ui.category.append(option);
+  if (subject.boss) return;
   const button = document.createElement("button");
   button.className =
     "subject-button" + (subject.stream ? " stream-subject" : "");
   button.dataset.key = subject.key;
   const num = document.createElement("span");
-  num.textContent = String(i + 1).padStart(2, "0");
+  num.textContent = String(ui.subjectNav.children.length + 1).padStart(2, "0");
   button.append(num, document.createTextNode(subject.name));
   button.addEventListener("click", () => setSubject(subject.key));
   ui.subjectNav.append(button);
@@ -1335,6 +1546,8 @@ function restart() {
 ui.start.addEventListener("click", restart);
 ui.introStart.addEventListener("click", restart);
 ui.sceneRestart.addEventListener("click", restart);
+ui.bossChallenge.addEventListener("click", () => setSubject("boss"));
+ui.bossAfterLesson.addEventListener("click", () => setSubject("boss"));
 ui.help.addEventListener("click", () => {
   if (game.running && !game.paused) pause();
   ui.helpDialog.showModal();
@@ -1388,6 +1601,7 @@ ui.voice.addEventListener("change", configureVoice);
 ui.previewVoice.addEventListener("click", previewVoice);
 ui.previewPace.addEventListener("click", previewPace);
 ui.moneyFormat.addEventListener("change", updateMoneyQuestion);
+ui.answerPolicy.addEventListener("change", updateTimeQuestion);
 ui.currencyKey.addEventListener("click", () => {
   if (!game.running || game.paused) return;
   ui.answer.value = "£" + ui.answer.value.replace(/^£/, "");

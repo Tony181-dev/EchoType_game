@@ -23,6 +23,12 @@ for (const f of [
   "voice-ryan.js",
   "voice-sonia-extra.js",
   "voice-ryan-extra.js",
+  "voices/jenny.js",
+  "voices/guy.js",
+  "voices/natasha.js",
+  "voices/william.js",
+  "voices/molly.js",
+  "voices.js",
   "lessons.js",
   "content.js",
   "courses.js",
@@ -31,10 +37,7 @@ for (const f of [
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), c);
 let clips = 0;
 for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
-  assert.equal(
-    voice.voice,
-    key === "sonia" ? "en-GB-SoniaNeural" : "en-GB-RyanNeural",
-  );
+  assert.equal(voice.voice, c.window.EchoVoiceCatalog.voices[key].voice);
   assert.equal(Object.keys(voice.characters).length, 36);
   assert.equal(voice.corrections.N.source, "N.");
   for (const pace of Object.values(c.window.EchoRhythm.DRILL_PACES))
@@ -191,7 +194,7 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
   console.log(
     "Passed: " +
       clips +
-      " non-silent neural spelling clips, 780 matching-voice phrases, complete subject coverage, voice-cache isolation and playback cancellation.",
+      " non-silent neural spelling clips, 2730 matching-voice phrases across seven voices, complete subject coverage, voice-cache isolation and playback cancellation.",
   );
 })().catch((e) => {
   console.error(e);

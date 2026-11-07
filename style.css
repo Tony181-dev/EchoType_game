@@ -16,6 +16,141 @@
 [hidden] {
   display: none !important;
 }
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.boss-launch {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #a78be4;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #39244f, #202c42);
+  color: #f0defe;
+  font-size: 12px;
+  cursor: pointer;
+}
+.boss-launch:hover {
+  border-color: #ddc4ff;
+  background: #503662;
+}
+.boss-hud {
+  position: absolute;
+  top: 48px;
+  left: 23px;
+  width: 40%;
+  max-width: 290px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #b289d77a;
+  border-radius: 8px;
+  background: #1a132ce8;
+}
+.boss-hud span {
+  color: #dbb8fa;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.boss-hud strong {
+  color: #f3dae5;
+  font:
+    600 12px "Space Grotesk",
+    sans-serif;
+}
+.space:has(.boss-hud:not([hidden])) .center-notice {
+  left: 6%;
+  top: 33%;
+  max-width: min(42%, 290px);
+}
+.boss-health-track {
+  grid-column: 1/-1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #432a46;
+}
+#bossFill {
+  height: 100%;
+  background: linear-gradient(90deg, #a97fff, #ff79b0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.time-question {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid #41646a;
+  border-radius: 8px;
+  background: #0c1c26;
+}
+.time-question strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: #c2e4e1;
+}
+.time-question small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #abc4cd;
+}
+.ielts-reference {
+  width: 100%;
+  flex-basis: 100%;
+  margin-bottom: 12px;
+  color: #c4d2df;
+}
+.ielts-reference summary {
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 32px;
+}
+.ielts-reference p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.reference-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #557b82;
+  border-radius: 7px;
+  background: #16323b;
+  color: #d1f3ed;
+  font-size: 12px;
+}
+.settings .best-line {
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .heading {
+    flex-wrap: wrap;
+  }
+  .heading-actions {
+    width: 100%;
+  }
+  .boss-hud {
+    top: 45px;
+    left: 14px;
+    width: calc(100% - 140px);
+  }
+  .boss-hud span {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #bossFill {
+    transition: none;
+  }
+}
 body {
   margin: 0;
   background:

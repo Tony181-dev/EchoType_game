@@ -3,12 +3,16 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const context = {
-  window: { matchMedia: () => ({ matches: false }) },
+  window: { matchMedia: () => ({ matches: false }), EchoCourses: {} },
   performance: { now: () => 0 },
   requestAnimationFrame() {},
   Math,
 };
 vm.createContext(context);
+vm.runInContext(
+  fs.readFileSync(path.join(__dirname, "..", "boss.js"), "utf8"),
+  context,
+);
 vm.runInContext(
   fs.readFileSync(path.join(__dirname, "..", "space.js"), "utf8") +
     "\nthis.Renderer=SpaceRenderer;",
@@ -62,3 +66,18 @@ assert.equal(renderer.particles.length, 5);
 console.log(
   "Passed: delayed-frame explosions, single hit resolution, frame-independent steering, pause and reduced effects.",
 );
+renderer.reset();
+const boss = { health: 10 };
+renderer.state = () => ({ boss });
+renderer.bossAttack(0);
+assert.equal(renderer.enemyShots.length, 1);
+renderer.updateShots(600);
+assert.equal(renderer.enemyShots.length, 0);
+assert.equal(renderer.rings.length, 1);
+renderer.updateShots(900);
+assert.equal(
+  renderer.rings.length,
+  1,
+  "A boss projectile impacts once even with delayed frames",
+);
+assert.equal(renderer.position(target, 100).x, 0.74);

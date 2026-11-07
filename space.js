@@ -14,6 +14,7 @@ class SpaceRenderer {
     this.particles = [];
     this.rings = [];
     this.shots = [];
+    this.enemyShots = [];
     this.recoil = 0;
     this.hitAt = -1000;
     this.last = performance.now();
@@ -28,6 +29,7 @@ class SpaceRenderer {
   reset() {
     this.particles = [];
     this.shots = [];
+    this.enemyShots = [];
     this.rings = [];
     this.hitAt = -1000;
     this.aim = 0.52;
@@ -37,6 +39,14 @@ class SpaceRenderer {
     this.recoil = -1000;
   }
   updateShots(now) {
+    for (const shot of this.enemyShots)
+      if (now - shot.born >= shot.life && !shot.exploded) {
+        shot.exploded = true;
+        this.impact();
+      }
+    this.enemyShots = this.enemyShots.filter(
+      (shot) => now - shot.born < shot.life + 60,
+    );
     // Settle the hit before discarding its projectile. A slow frame must not
     // swallow the explosion just because the short laser animation elapsed.
     for (const shot of this.shots) {
@@ -56,6 +66,8 @@ class SpaceRenderer {
   }
   position(e, now) {
     const p = Math.max(0, Math.min(1, (now - e.born) / (e.deadline - e.born)));
+    if (this.state().boss)
+      return { ...window.EchoBoss.point(now, this.reduced.matches), p };
     const spawn = 0.28 + e.lane * 0.2;
     return {
       x: 1.04 - 0.85 * p,
@@ -98,6 +110,15 @@ class SpaceRenderer {
     this.hitAt = now;
     this.aim = this.heroY < 0.5 ? 0.65 : 0.39;
     this.burst(0.19, this.heroY, "#ff8c91", now);
+  }
+  bossAttack(now) {
+    this.enemyShots.push({
+      born: now,
+      life: 500,
+      origin: window.EchoBoss.point(now, this.reduced.matches),
+      target: this.heroY,
+    });
+    this.state().boss.attackAt = now;
   }
   wrong() {
     this.recoil = performance.now() - 100;
@@ -480,7 +501,29 @@ class SpaceRenderer {
       c.restore();
     }
     this.ship(w * 0.19, h * this.heroY, scale, time);
-    if (g.running) {
+    if (g.boss) {
+      window.EchoBoss.draw(c, w, h, time, g.boss, this.reduced.matches);
+      const event = (g.events || []).find(
+        (ev) => !ev.resolved && ev.born <= time,
+      );
+      if (g.running && event) {
+        const remaining = Math.max(
+          0,
+          (event.deadline - time) / (event.deadline - event.born),
+        );
+        c.strokeStyle = "#c8f580";
+        c.lineWidth = 3;
+        c.beginPath();
+        c.arc(
+          w * 0.74,
+          h * 0.52,
+          Math.min(h * 0.25, w * 0.14) * 1.15,
+          -Math.PI / 2,
+          -Math.PI / 2 + Math.PI * 2 * remaining,
+        );
+        c.stroke();
+      }
+    } else if (g.running) {
       const currentTarget = (g.events || []).find(
         (ev) => !ev.resolved && ev.born <= time,
       );
@@ -538,6 +581,26 @@ class SpaceRenderer {
       }
     }
     this.updateShots(now);
+    for (const shot of this.enemyShots) {
+      const p = Math.min(1, (time - shot.born) / shot.life),
+        x = (shot.origin.x + (0.19 - shot.origin.x) * p) * w,
+        y = (shot.origin.y + (shot.target - shot.origin.y) * p) * h;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.shadowBlur = 16;
+      c.shadowColor = "#ff518b";
+      c.fillStyle = "#ffb8ca";
+      c.beginPath();
+      c.arc(x, y, 7 + Math.sin(time / 35) * 1.3, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#ff5a88";
+      c.lineWidth = 4;
+      c.beginPath();
+      c.moveTo(x + 25, y);
+      c.lineTo(x - 7, y);
+      c.stroke();
+      c.restore();
+    }
     for (const s of this.shots) {
       const p = Math.min(1, (now - s.born) / s.life);
       c.save();
