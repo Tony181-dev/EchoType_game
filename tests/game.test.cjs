@@ -228,6 +228,7 @@ for (const f of [
   "lessons.js",
   "content.js",
   "courses.js",
+  "variety.js",
   "questions.js",
   "rhythm.js",
   "drills.js",
@@ -349,7 +350,9 @@ const flush = () => new Promise((r) => setImmediate(r));
     ["hard", 3],
   ]) {
     elements.difficulty.value = difficulty;
-    await e("start()");
+    await e(
+      "start([{answer:'07700900456', spoken:'07700900456', spell:false}])",
+    );
     await flush();
     assert.equal(e("game.maxHealth"), hp);
     assert.equal(e("game.health"), hp);
@@ -383,10 +386,11 @@ const flush = () => new Promise((r) => setImmediate(r));
   elements.learning.value = "phrase";
   await e("start()");
   assert.equal(e("game.roundLimit"), 10);
-  assert.equal(e("game.text"), c.EchoCourses.money.items[0].answer);
+  const moneyDeck = e("game.deck");
+  assert.equal(e("game.text"), moneyDeck[0].answer);
   for (let index = 0; index < 10; index++) {
     assert.equal(e("game.round"), index + 1);
-    assert.equal(e("game.text"), c.EchoCourses.money.items[index].answer);
+    assert.equal(e("game.text"), moneyDeck[index].answer);
     lastSpeech.onend();
     await flush();
     if (index === 2) {
@@ -397,9 +401,7 @@ const flush = () => new Promise((r) => setImmediate(r));
     } else {
       e(
         "type(" +
-          JSON.stringify(
-            c.EchoCourses.money.items[index].answer.replace("£", ""),
-          ) +
+          JSON.stringify(moneyDeck[index].answer.replace("£", "")) +
           ",true)",
       );
       advance(701);
@@ -419,14 +421,10 @@ const flush = () => new Promise((r) => setImmediate(r));
   assert.equal(e("game.mode"), "practice");
   assert.equal(e("game.course"), "review");
   assert.equal(e("game.roundLimit"), 1);
-  assert.equal(e("game.text"), c.EchoCourses.money.items[2].answer);
+  assert.equal(e("game.text"), moneyDeck[2].answer);
   lastSpeech.onend();
   await flush();
-  e(
-    "type(" +
-      JSON.stringify(c.EchoCourses.money.items[2].answer.replace("£", "")) +
-      ",true)",
-  );
+  e("type(" + JSON.stringify(moneyDeck[2].answer.replace("£", "")) + ",true)");
   advance(701);
   advance(1801);
   await flush();
@@ -493,13 +491,19 @@ const flush = () => new Promise((r) => setImmediate(r));
   elements.lessonPage.value = "3";
   elements.lessonPage.handlers.change();
   await e("start()");
-  assert.equal(e("game.text"), c.EchoCourses.streets.pages[3].items[0].answer);
-  assert.equal(e("game.page"), 3);
+  const firstStreetDeck = e("game.deck.map(item=>item.answer)");
+  assert.equal(new Set(firstStreetDeck).size, 10);
+  assert.equal(elements.lessonPageWrap.hidden, true);
+  assert.equal(e("game.page"), 0);
   e("finish('Done','')");
-  elements.nextLesson.handlers.click();
-  await flush();
-  assert.equal(e("game.page"), 4);
-  assert.equal(e("game.text"), c.EchoCourses.streets.pages[4].items[0].answer);
+  await e("start()");
+  assert(
+    e(
+      "game.deck.every(item=>!" +
+        JSON.stringify(firstStreetDeck) +
+        ".includes(item.answer))",
+    ),
+  );
   e("setSubject('letters')");
   assert.equal(elements.learning.value, "reflex");
   assert(elements.learning.disabled);
@@ -674,6 +678,26 @@ const flush = () => new Promise((r) => setImmediate(r));
   e("setSubject('streets')");
   assert.equal(e("game.boss"), null);
   assert.equal(elements.bossHud.hidden, true);
+  e(
+    "game.running=true; game.paused=false; game.item={spokenParts:[{text:'Nina'},{text:'Parker'}]}; var composedDone=false; narrate('Nina Parker',()=>composedDone=true)",
+  );
+  assert.equal(lastSpeech.text, "Nina");
+  lastSpeech.onend();
+  await flush();
+  assert.equal(lastSpeech.text, "Parker");
+  lastSpeech.onend();
+  await flush();
+  assert.equal(e("composedDone"), true);
+  e("composedDone=false; narrate('Nina Parker',()=>composedDone=true)");
+  const interrupted = lastSpeech;
+  e("cancel()");
+  interrupted.onend();
+  await flush();
+  assert.equal(
+    e("composedDone"),
+    false,
+    "An interrupted composed reading must not advance to a late target",
+  );
   console.log(
     "Passed: audio rhythm scaling, whole word before spelling, all subjects, scoring/health, pause/resume, phrase answers, speed presets, voices, multi-page lessons, saved progress, mistake review and isolated finite/endless character sessions.",
   );

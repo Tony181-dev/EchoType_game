@@ -133,7 +133,7 @@ const subjects = [
   {
     key: "time",
     name: "Ngày & giờ",
-    hint: "Nhập ngày như 13 March hoặc giờ như 8:15.",
+    hint: "Nghe ngày hoặc giờ và nhập thông tin vừa nghe.",
     spell: false,
   },
   {
@@ -210,12 +210,8 @@ function updateLessonNote() {
   const boss = !!currentSubject().boss;
   ui.studyPlanWrap.hidden = stream || boss;
   ui.drillLengthWrap.hidden = !stream;
-  ui.lessonPageWrap.hidden =
-    stream ||
-    boss ||
-    ui.studyPlan.value !== "series" ||
-    ui.mode.value === "survival";
-  const key = progressKey(ui.category.value, ui.learning.value, pageIndex());
+  ui.lessonPageWrap.hidden = true;
+  const key = progressKey(ui.category.value, ui.learning.value, 0);
   const progress = courseProgress[key];
   const length = ui.studyPlan.value === "series" ? 10 : 5;
   ui.lessonNote.textContent = boss
@@ -232,15 +228,11 @@ function updateLessonNote() {
           lesson.bank.length +
           " câu, không lặp trước khi hết lượt."
         : ui.studyPlan.value === "series"
-          ? "Bài " +
-            (pageIndex() + 1) +
-            "/" +
-            lesson.pages.length +
-            " · " +
-            lesson.title +
-            " · " +
+          ? "Bốc " +
             length +
-            " câu theo thứ tự." +
+            " câu ngẫu nhiên từ " +
+            lesson.bank.length +
+            " câu và biến thể của chủ đề." +
             (progress
               ? " Kết quả tốt nhất: " +
                 progress.bestCorrect +
@@ -635,16 +627,16 @@ function updateMoneyQuestion() {
     : "Write NO MORE THAN ONE WORD AND/OR A NUMBER.";
   ui.moneyPrompt.textContent = provided ? "Price: £ ______" : "Price: ______";
   ui.moneyHint.textContent = provided
-    ? "£ đã có sẵn trong đề. Chỉ nhập số, ví dụ 15.50."
-    : "Điền cả đơn vị, ví dụ £15.50 hoặc 15.50 pounds. Game có nút £ để chèn.";
+    ? "£ đã có sẵn. Chỉ nhập số tiền nghe được, dùng dấu chấm và hai số lẻ."
+    : "Nhập số tiền nghe được kèm pounds hoặc ký hiệu £. Game có nút £ để chèn.";
   if (money)
     ui.prompt.textContent = provided
       ? "Nghe giá tiền · chỉ điền phần số"
       : "Nghe giá tiền · điền số và đơn vị";
   if (money)
     ui.answer.placeholder = provided
-      ? "Chỉ nhập số tiền, ví dụ 15.50"
-      : "Ví dụ 15.50 pounds hoặc £15.50";
+      ? "Nhập số tiền vừa nghe"
+      : "Nhập số tiền và đơn vị vừa nghe";
 }
 function updateTimeQuestion() {
   const category =
@@ -667,6 +659,12 @@ function updateTimeQuestion() {
       ? "Điền ngày và tháng, tối đa 3 từ và/hoặc một số."
       : "Điền giờ bằng số, ví dụ 6:30 hoặc 6.30."
     : "Ví dụ half past six = 6:30 = 06.30. Ngày có thể viết 13 March hoặc March 13th. Đây là cách chấm linh hoạt để luyện nghe.";
+  if (game.running)
+    ui.timeHint.textContent = strict
+      ? isDate
+        ? "Điền ngày tháng trong giới hạn từ của câu hỏi."
+        : "Điền giờ bằng số, dùng dấu hai chấm hoặc dấu chấm."
+      : "Có thể ghi giờ bằng số hoặc chữ, ngày tháng theo cách tương đương. Hãy nghe để xác định đáp án.";
 }
 function updateBossHud() {
   if (!game.boss) return;
@@ -814,10 +812,12 @@ async function start(reviewDeck = null) {
           : "random";
   const deck = reviewing
     ? reviewDeck.map((item) => ({ ...item }))
-    : course === "series"
-      ? EchoCourses[ui.category.value].pages[pageIndex()].items.map((item) => ({
-          ...item,
-        }))
+    : !boss && !stream && ui.mode.value !== "survival"
+      ? questionBag.draw(
+          ui.category.value,
+          EchoCourses[ui.category.value].bank,
+          ui.studyPlan.value === "series" ? 10 : 5,
+        )
       : [];
   const bossState = boss ? EchoBoss.create() : null;
   game = {
@@ -833,7 +833,7 @@ async function start(reviewDeck = null) {
     events: [],
     results: [],
     course,
-    page: pageIndex(),
+    page: 0,
     drillStats: {},
     moneyFormat: boss ? "provided" : ui.moneyFormat.value || "provided",
     answerPolicy: ui.answerPolicy.value || "flexible",
@@ -940,6 +940,21 @@ function later(fn, delay) {
 async function narrate(text, done) {
   const gen = game.gen;
   try {
+    if (game.item.spokenParts) {
+      for (const part of game.item.spokenParts) {
+        if (gen !== game.gen || !game.running || game.paused) return;
+        if (part.text) await audio.narrate(part.text, game.speed);
+        else {
+          const plan = await audio.play(part.characters, game.speed, 0.15);
+          if (!plan) return;
+          await new Promise((resolve) =>
+            setTimeout(resolve, plan.duration + 150),
+          );
+        }
+      }
+      if (gen === game.gen && game.running && !game.paused) done();
+      return;
+    }
     if (
       (game.itemCategory || game.category) === "phone" &&
       !game.item.recorded
@@ -1289,11 +1304,8 @@ function showResults() {
     game.results.length < game.roundLimit;
   ui.replayLesson.textContent = game.drill
     ? "Luyện chuỗi mới ↻"
-    : "Học lại bài này";
-  ui.nextLesson.hidden =
-    !!game.drill ||
-    game.course !== "series" ||
-    game.page + 1 >= EchoCourses[game.category].pages.length;
+    : "Lượt ngẫu nhiên mới ↻";
+  ui.nextLesson.hidden = true;
   if (game.drill) {
     lastMistakes = [];
     const count = game.hits + game.misses;

@@ -32,6 +32,7 @@ for (const f of [
   "lessons.js",
   "content.js",
   "courses.js",
+  "variety.js",
   "rhythm.js",
 ])
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), c);
@@ -81,7 +82,18 @@ for (const [key, voice] of Object.entries(c.window.EchoVoices)) {
       );
   for (const course of Object.values(c.window.EchoCourses))
     for (const row of course.bank)
-      if (course !== c.window.EchoCourses.phone || row.recorded)
+      if (row.spokenParts) {
+        for (const part of row.spokenParts) {
+          if (part.text)
+            assert(
+              voice.narrations[part.text],
+              key + " missing composed phrase " + part.text,
+            );
+          else
+            for (const char of part.characters.replace(/[^A-Z0-9]/g, ""))
+              assert(voice.characters[char]);
+        }
+      } else if (course !== c.window.EchoCourses.phone || row.recorded)
         assert(
           voice.narrations[row.spoken],
           key + " missing course phrase " + row.spoken,

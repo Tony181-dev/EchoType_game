@@ -18,7 +18,7 @@ Open the printed address, normally `http://127.0.0.1:8765`. Set `PORT` to choose
 
 ## Learn in short, structured sessions
 
-The **420 questions are divided into 42 ordered lessons of 10**, across 10 topics. Street names and personal names each have five lessons; the other topics each have four. Choose a lesson within any topic, and use **Next lesson** after the report to continue.
+The bank contains **2,426 questions and variants across 10 topics**. Both five-question and ten-question rounds draw randomly from the whole selected topic. Full names combine recorded first names and surnames. Variable addresses, phone numbers, reference codes and location directions add more listening combinations. Each composed reading uses the selected voice throughout. New house numbers are read digit by digit, including a letter where present.
 
 | Topic                  | What you practise                                    |
 | ---------------------- | ---------------------------------------------------- |
@@ -33,7 +33,7 @@ The **420 questions are divided into 42 ordered lessons of 10**, across 10 topic
 | Directions             | Position, distance and direction phrases             |
 | Companies and products | Unfamiliar technology names                          |
 
-Choose an ordered lesson, a random five-question session, or endless survival. Random questions are drawn without repetition until the topic's pool is exhausted, including across sessions; the cycle boundary avoids an immediate repeat. Reports show each answer, whole-question accuracy and letter accuracy. **Review mistakes** replays attempted questions answered incorrectly, without health loss. Unattempted questions are not marked wrong. Each lesson has its own progress record, saved locally with settings and selected pages.
+Choose a random round of five or ten questions, or endless survival. Questions are drawn without repetition until the topic's pool is exhausted, including across sessions. A round never contains duplicate answers, even when it spans a pool boundary. Reports show each answer, whole-question accuracy and letter accuracy. **Review mistakes** replays attempted questions answered incorrectly, without health loss. Progress and settings are saved locally. During play, price and date instructions describe the required format without displaying example answers.
 
 ### Continuous character training
 
